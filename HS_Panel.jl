@@ -1,9 +1,18 @@
 #=
 
+SET UP
 1. Input Airfoil coordinates
 2. Plot airfoil coordinates
 3. Plot airfoil panels using the airfoil coordinates
 4. Find midpoint-coordinates for each panel
+5. Find distance from each panel to every other panel
+
+MATH
+6. Calculate influences - find how each panel vortex influences every other panel vortex
+7. Input Boundary Conditions
+8. Set up systems of equations (matrix) -- should have N + 1 equations where N = number of panels (one equation for every panel + 1 for Kutta condition)
+9. Solve systems of equations
+10. Plot results
 
 =#
 
@@ -52,11 +61,24 @@ function plot_midpoints(file)
 end
 
 # Find the distance from each midpoint to every other midpoint
+# distnace is an Array. Each vector contains the distance from a specific midpoint/panel to every other panel. 
 
-function distance_midpoints(x_mid, y_mid)
-    distance = Float64[]
-    for i in range(1, length(x_mid))
-        push!(distance, x[i])
+function distance_midpoints(file)
+    x_mid, y_mid = find_midpoints(file)
+    distance = []
+    n = length(x_mid)
+    for j in range(1, length(x_mid))
+        x_new = x_mid[j]
+        y_new = y_mid[j]
+        length = []
+        for i in 1:n
+            pyth = sqrt((x_new + x_mid[i])^2 + (y_new + y_mid[i])^2)
+            push!(length, pyth)
+        end
+        push!(distance, length)
+    end
+    distance
+end
 
 
-# plot_midpoints("naca0012.txt")
+# distance_midpoints("naca0012.txt")
