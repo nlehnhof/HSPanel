@@ -143,7 +143,7 @@ AoA = 0.0 * (180/pi)
 # Page 66 --- equations 2.195 and 2.196
 
 # Find rijs...
-
+# change from x_star to x_mid
 function find_rijs(file)
     x, y = get_coordinates(file)
     n = length(x)
@@ -153,8 +153,8 @@ function find_rijs(file)
         x_star = x[i]
         y_star = y[i]
         for j in 1:n-1
-            r_ij = [x_star - x[j], y_star - y[j], 0]
-            r_ij1 = [x_star - x[j+1], y_star - y[j+1], 0]
+            r_ij = [x_star - x[j], y_star - y[j]]
+            r_ij1 = [x_star - x[j+1], y_star - y[j+1]]
             push!(r_ij_lst, r_ij)
             push!(r_ij1_lst, r_ij1)
         end
@@ -195,15 +195,17 @@ function find_beta(file)
         for j in 1:n-1
             if j == i
                 beta = π
-                push!(beta_list, beta * 180/pi)
+                push!(beta_list, beta)
             else
-                beta = (atan(((x[j] - x_bar) * (y[j+1] - y_bar) - (y[j] - y_bar) * (x[j+1] - x_bar)) / ((x[j] - x_bar) * (x[j+1] - x_bar) + (y[j] - y_bar) * (y[j+1] - y_bar))))
-                push!(beta_list, beta * 180/pi)
+                beta = (atan(((x[j] - x_bar) * (y[j+1] - y_bar) - (y[j] - y_bar) * (x[j+1] - x_bar)) , ((x[j] - x_bar) * (x[j+1] - x_bar) + (y[j] - y_bar) * (y[j+1] - y_bar))))
+                push!(beta_list, beta)
             end
         end
     end
     beta_list
 end
+
+print(find_beta("naca0012.txt"))
 
 #=
 
@@ -212,5 +214,11 @@ end
 
 r_kj+1 -- yes
 r_kj -- yes
+
+
+Remove all push!()
+Don't keep reading in the file
+Initialize matrix rather than do it twice (i and j)
+Trianary Operator
 
 =#
