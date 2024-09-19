@@ -16,7 +16,7 @@ MATH
 
 =#
 
-using Plots, LinearAlgebra, QuadGK
+using Plots, LinearAlgebra
 
 function get_coordinates(file)
     x, y = open(file, "r") do f
@@ -111,7 +111,7 @@ end
 
 function sin_theta(file)
     x, y = get_coordinates(file)
-    n = length(n)
+    n = length(x)
     sin_full = []
     cos_full = []
     tan_full = []
@@ -142,64 +142,75 @@ AoA = 0.0 * (180/pi)
 # Calculate velocities while inputting boundary conditions such as Kutta condition and no-flow condition...
 # Page 66 --- equations 2.195 and 2.196
 
-function velocities()
-    
-    x_mid, y_mid = find_midpoints(file)
-    sources, panel_length, l = make_sources(file)
-    
-    u_velocity = []
-    v_velocity = []
+# Find rijs...
 
+function find_rijs(file)
+    x, y = get_coordinates(file)
+    n = length(x)
+    r_ij_lst = []
+    r_ij1_lst = []
+    for i in 1:n-1
+        x_star = x[i]
+        y_star = y[i]
+        for j in 1:n-1
+            r_ij = [x_star - x[j], y_star - y[j], 0]
+            r_ij1 = [x_star - x[j+1], y_star - y[j+1], 0]
+            push!(r_ij_lst, r_ij)
+            push!(r_ij1_lst, r_ij1)
+        end
+    end
+    r_ij_lst, r_ij1_lst
+end
+
+# Find sin(theta i - theta j) etc.
+
+function find_thetas(file)
+    sin_full, cos_full, tan_full, norm_full = sin_theta(file)
+    n = length(sin_full)
+    sin_thetai_j = [] 
+    cos_thetai_j = []
+    for i in 1:n-1
+        for j in 1:n-1
+            sin_theta = sin_full[i] * sin_full[j] - cos_full[i] * cos_full[j]
+            cos_theta = cos_full[i] * cos_full[j] + sin_full[i] * sin_full[j]
+            push!(sin_thetai_j, sin_theta)
+            push!(cos_thetai_j, cos_theta)
+        end
+    end
+    sin_thetai_j, cos_thetai_j
 end
 
 
+# Find Beta
+
+function find_beta(file)
+    beta_list = []
+    x, y = get_coordinates(file)
+    x_mid, y_mid = find_midpoints(file)
+    n = length(x)
+    for i in 1:n
+        x_bar = x_mid[1]
+        y_bar = y_mid[1]
+
+        for j in 1:n-1
+            if j == i
+                beta = π
+                push!(beta_list, beta * 180/pi)
+            else
+                beta = (atan(((x[j] - x_bar) * (y[j+1] - y_bar) - (y[j] - y_bar) * (x[j+1] - x_bar)) / ((x[j] - x_bar) * (x[j+1] - x_bar) + (y[j] - y_bar) * (y[j+1] - y_bar))))
+                push!(beta_list, beta * 180/pi)
+            end
+        end
+    end
+    beta_list
+end
+
 #=
 
-\Beta
-\thtea k - \theta j
+\Beta -- help!!
+\thtea k - \theta j -- help-ish
 
-r_kj+1
-r_kj
-
+r_kj+1 -- yes
+r_kj -- yes
 
 =#
-
-
-# _______________________________________________________________
-# function integral_u(x_int, y_int, l)
-#     integral_u = (x_int - x) / ((x_int - x)^2 + y_int^2)
-#     result, error = quadgk(integral_u, 0, l)
-#     return result
-# end
-
-# function integral_v(x_int, y_int, l)
-#     integral_v = (y_int) / ((x_int - x)^2 + y_int^2)
-#     result, error = quadgk(integral_v, 0, l)
-#     return result
-# end
-
-# # Calculate velocities!!!
-
-# function velocity(file)
-#     x_mid, y_mid = find_midpoints(file)
-#     panel_length = make_sources(file)
-#     l = []
-#     for each in eachindex(panel_length)
-#         push!(l, sqrt((each[1]^2 + each[2]^2)))
-#     end
-
-#     u = []
-#     for each in eachindex(x_mid)
-#         int_u = (1/ 2pi) * q(x) * integral_u(x_mid[each], y_mid[each], l[each])
-#         push!(u, int_u)
-#     end
-
-#     v = []
-#     for each in eachindex(x_mid)
-#         int_v = (1 / 2pi) * q(x) * integral_v(x_mid[each], y_mid[each], l[each])
-#         push!(v, int_v)
-#     end
-#     u, v
-# end
-
-# WHAT IS q(x)????
