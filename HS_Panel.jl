@@ -153,6 +153,17 @@ function velocities()
 end
 
 
+#=
+
+\Beta
+\thtea k - \theta j
+
+r_kj+1
+r_kj
+
+
+=#
+
 
 # _______________________________________________________________
 # function integral_u(x_int, y_int, l)
