@@ -45,8 +45,8 @@ end
 function find_midpoints(x, y)
     # Initialize new variables for midpoints
     n = length(x)
-    x_mid = zeros(n)
-    y_mid = zeros(n)
+    x_mid = zeros(n-1)
+    y_mid = zeros(n-1)
 
     # Find midpoints
     for i in 1:n-1
@@ -80,6 +80,7 @@ function distance_midpoints(x_mid, y_mid)
     distance
 end
 
+
 # Make each panel a vector -- simply point 2 - point 1
 # Find the length of each panel -- will use this in our integrals
 
@@ -108,6 +109,9 @@ function sin_cos_theta(x, y)
     sin_theta, cos_theta
 end
 
+sin_theta, cos_theta = sin_cos_theta(x, y)
+
+
 # We can now write our boundary conditions in equation form.
 # Flow tangency condition is V dot n_hat = 0
 
@@ -117,35 +121,39 @@ end
 # Find rijs...
 # change from x_star to x_mid
 
-function find_rijs(x_mid, y_mid)
-    n = length(x_mid)
-    r_ijs = zeros(Float64, n-1, n-1)
 
-    for i in 1:n-1
+function find_rijs(x, y, x_mid, y_mid)  # lengths: 131, 131, 130, 130
+    n = length(x_mid)
+    r_ij = zeros(Float64, n, n)
+
+    for i in 1:n
         x_star = x_mid[i]
         y_star = y_mid[i]
-        for j in 1:n-1
-            r_ijs[i, j] = [x_star - x[j], y_star - y[j]]
+        for j in 1:n
+            r_ij[i, j] = sqrt((x_star - x[j])^2 + (y_star - y[j])^2)
         end
     end
-    r_ijs
+    r_ij   # 130 x 130
 end
+
+r_ij = find_rijs(x, y, x_mid, y_mid)
 
 # Find sin(theta i - theta j) etc.
 
-function find_thetas(x, y)
-    sin_theta, cos_theta = sin_cos_theta(x, y)
-    n = length(sin_theta)
-    sin_thetai_j = zeros(n, n) 
-    cos_thetai_j = zeros(n, n)
+function find_thetas(x, y, sin_theta, cos_theta)
+    n = length(x)
+    sin_theta_ij = zeros(n-1, n-1) 
+    cos_theta_ij = zeros(n-1, n-1)
     for i in 1:n-1
         for j in 1:n-1
-            sin_thetai_j[i, j] = sin_theta[i] * sin_theta[j] - cos_theta[i] * cos_theta[j]
-            cos_thetai_j[i, j] = cos_theta[i] * cos_theta[j] + sin_theta[i] * sin_theta[j]
+            sin_theta_ij[i, j] = sin_theta[i] * sin_theta[j] - cos_theta[i] * cos_theta[j]
+            cos_theta_ij[i, j] = cos_theta[i] * cos_theta[j] + sin_theta[i] * sin_theta[j]
         end
     end
-    length(sin_thetai_j), length(cos_thetai_j)
+    sin_theta_ij, cos_theta_ij   # 130 x 130 matrices
 end
+
+sin_theta_ij, cos_theta_ij = find_thetas(x, y, sin_theta, cos_theta)
 
 # Find Beta
 
@@ -159,5 +167,24 @@ function find_beta(x, y, x_mid, y_mid)
             if (j == i) beta[i, j] = π else beta[i, j] = (atan(((x[j] - x_bar) * (y[j+1] - y_bar) - (y[j] - y_bar) * (x[j+1] - x_bar)) , ((x[j] - x_bar) * (x[j+1] - x_bar) + (y[j] - y_bar) * (y[j+1] - y_bar)))) end
         end
     end
-    length(beta)
+    beta   # length 130 x 130
 end
+
+beta = find_beta(x, y, x_mid, y_mid)
+
+# Find Aij
+# rijs, sin_cos_theta, beta
+
+function find_Aij(x, y, r_ij, sin_theta_ij, cos_theta_ij, beta)
+    n = length(x)  # 131
+    Aij = zeros(n-1, n-1)   # 130 x 130
+    for i in 1:n-1
+        for j in 1:n-2
+            Aij[i, j] = log(r_ij[i, j+1]/r_ij[i, j]) * cos_theta_ij[i] + beta[i] * cos_theta_ij[i]
+        end
+        Aij[i, n-1] = log(r_ij[i, n-1]/r_ij[i, n-2]) * cos_theta_ij[i] - beta[i] * sin_theta_ij[i]
+    end
+    Aij
+end
+
+Aij = find_Aij(x, y, r_ij, sin_theta_ij, cos_theta_ij, beta)
