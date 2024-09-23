@@ -18,10 +18,6 @@ MATH
 
 using Plots, LinearAlgebra
 
-# Freestream Velocity and AoA
-V_inf = 00.00
-AoA = 0.0 * (180/pi)
-
 function get_coordinates(file)
     x, y = open(file, "r") do f
         x = Float64[]
@@ -153,7 +149,7 @@ function find_thetas(x, y, sin_theta, cos_theta)
     sin_theta_ij, cos_theta_ij   # 130 x 130 matrices
 end
 
-sin_theta_ij, cos_theta_ij = find_thetas(x, y, sin_theta, cos_theta)
+# sin_theta_ij, cos_theta_ij = find_thetas(x, y, sin_theta, cos_theta)
 
 # Find Beta
 
@@ -170,21 +166,57 @@ function find_beta(x, y, x_mid, y_mid)
     beta   # length 130 x 130
 end
 
-beta = find_beta(x, y, x_mid, y_mid)
+# beta = find_beta(x, y, x_mid, y_mid)
 
 # Find Aij
 # rijs, sin_cos_theta, beta
 
-function find_Aij(x, y, r_ij, sin_theta_ij, cos_theta_ij, beta)
-    n = length(x)  # 131
-    Aij = zeros(n-1, n-1)   # 130 x 130
-    for i in 1:n-1
-        for j in 1:n-2
-            Aij[i, j] = log(r_ij[i, j+1]/r_ij[i, j]) * cos_theta_ij[i] + beta[i] * cos_theta_ij[i]
+function find_A(x, y, r_ij, sin_theta_ij, cos_theta_ij, beta)
+    n = length(x) - 1  # 130
+    A = zeros(n+1, n+1)   # 131 x 131
+
+    # These for loops give us the values for the 130 x 129 matrix
+    for i in 1:n
+        val = zeros(130)
+        for j in 1:n-1
+            A[i, j] = log(r_ij[i, j+1]/r_ij[i, j]) * sin_theta_ij[i] + beta[i] * cos_theta_ij[i]
+            val[j] = log(r_ij[i, j+1]/r_ij[i, n-2]) * cos_theta_ij[i] - beta[i] * sin_theta_ij[i]
         end
-        Aij[i, n-1] = log(r_ij[i, n-1]/r_ij[i, n-2]) * cos_theta_ij[i] - beta[i] * sin_theta_ij[i]
+        A[i, n+1] = sum(val)  # HELP
     end
-    Aij
+
+    # This supposedly gives us the 131st row  # HELP
+    for j in 1:n
+        A[n+1, j] = beta[j] * sin_theta_ij[j] - log(r_ij[j+1]/r_ij[j]) * cos_theta_ij[j]
+    end
+
+    # Gives us (131, 131) value  # HELP
+        A[n+1, n+1] = beta[n] * cos_theta_ij[n] + log(r_ij[n+1]/r_ij[n]) * sin_theta_ij[n]
+
+    return A
 end
 
-Aij = find_Aij(x, y, r_ij, sin_theta_ij, cos_theta_ij, beta)
+find_A(x, y, r_ij, sin_theta_ij, cos_theta_ij, beta)
+
+# Help: A[:, n]
+# I need j to go to n = 130, but the sin_cos_theta vectors restrict it to n-1 = 129
+
+
+# Freestream Velocity and AoA
+V_inf = 10.00
+alpha = 5.0 * (180/pi)
+
+function find_b(sin_theta, cos_theta, V_inf, alpha)
+    n = length(x)  # 131
+    b = zeros(n)
+
+    for i in 1:n-1
+        b[i] = 2 * π * V_inf * (sin_theta[i] * sin(alpha) - cos_theta[i] * cos(alpha))
+    end
+    
+    b[n] = -2 * π * V_inf * ((cos_theta[1] * cos(alpha) + sin_theta[1] * sin(alpha)) + (cos_theta[n-1] * cos(alpha) - sin_theta[n-1] * sin(alpha)))
+
+    return b
+end
+
+b = find_b(sin_theta, cos_theta, V_inf, alpha)
