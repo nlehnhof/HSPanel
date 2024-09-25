@@ -1,29 +1,22 @@
 #=
 
-Hess-Smith panel method is a numberical technique used in computational
-fluid dynamics to analyze fluid flow about a body. In this example, we use an airfoil (NACA0012).
-
 SET UP
 1. Input Airfoil coordinates
 2. Plot airfoil coordinates
 3. Plot airfoil panels using the airfoil coordinates
 4. Find midpoint-coordinates for each panel
+5. Find distance from each panel to every other panel
 
 MATH
-5. Calculate influences - find how each panel vortex influences every other panel vortex
-6. Input Boundary Conditions
-7. Set up systems of equations (matrix) -- should have N + 1 equations where N = number of panels (one equation for every panel + 1 for Kutta condition)
-8. Solve systems of equations to find the source strength of each point and our circulation strenght (gamma)
-9. Find the tangential velocity at each panel
-10. Find the Coefficient of Pressure at each point (x_mid, y_mid)
+6. Calculate influences - find how each panel vortex influences every other panel vortex
+7. Input Boundary Conditions
+8. Set up systems of equations (matrix) -- should have N + 1 equations where N = number of panels (one equation for every panel + 1 for Kutta condition)
+9. Solve systems of equations
+10. Plot results
 
 =#
 
-using Plots
-
-# Freestream Velocity and AoA
-alpha = 3 * pi/180
-V_inf = 1.0
+using Plots, LinearAlgebra
 
 function get_coordinates(file)
     x, y = open(file, "r") do f
@@ -54,14 +47,41 @@ function find_midpoints(x, y)
     x_mid, y_mid
 end
 
+# find_midpoints("naca0012.txt")
+
 x_mid, y_mid = find_midpoints(x, y)
 
-function plot_coordinates()
-    plot(x, y, marker = (:circle, 2), line = :solid, aspect_ratio=:equal, label = "coordinates", title = "NACA 0012")
-    scatter!(x_mid, y_mid, marker = (:square, 1), label = "midpoints")
-end
-
 # Find the distance from each midpoint to every other midpoint
+# distnace is an Array. Each vector contains the distance from a specific midpoint/panel to every other panel. 
+
+# function distance_midpoints(x_mid, y_mid)
+#     n = length(x_mid)
+#     distance = zeros(Float64, n-1, n)
+#     for i in 1:n-1
+#         x_new = x_mid[i]
+#         y_new = y_mid[i]
+#         for j in 1:n-1
+#             distance[i, j] = sqrt((x_new + x_mid[j])^2 + (y_new + y_mid[j])^2) 
+#         end
+#     end
+#     distance
+# end
+
+
+# Make each panel a vector -- simply point 2 - point 1
+# Find the length of each panel -- will use this in our integrals
+
+# function panel_length(x, y)
+#     n = length(x)
+#     len = zeros(n-1) 
+#     for i in 1:n-1
+#         panel_x = x[i + 1] - x[i]
+#         panel_y = y[i + 1] - y[i]
+#         len[i] = sqrt((panel_x^2 + panel_y^2))
+#     end
+#     len
+# end
+
 # Because we chose to model control points at the center of the panels rather than at the center of the surface they are easily computed. The methodology doesn't actually need \theta but rather sin \theta and cos \theta.
 
 function sin_cos_theta(x, y)
@@ -78,12 +98,16 @@ end
 
 sin_theta, cos_theta = sin_cos_theta(x, y)
 
+
 # We can now write our boundary conditions in equation form.
 # Flow tangency condition is V dot n_hat = 0
 
 # Calculate velocities while inputting boundary conditions such as Kutta condition and no-flow condition...
+# Page 66 --- equations 2.195 and 2.196
 
 # Find rijs...
+# change from x_star to x_mid
+
 
 function find_rijs(x, y, x_mid, y_mid)  # lengths: 131, 131, 130, 130
     n = length(x)
@@ -128,19 +152,18 @@ function find_beta(x, y, x_mid, y_mid)
             if (j == i) beta[i, j] = π else beta[i, j] = (atan(((x[j] - x_bar) * (y[j+1] - y_bar) - (y[j] - y_bar) * (x[j+1] - x_bar)) , ((x[j] - x_bar) * (x[j+1] - x_bar) + (y[j] - y_bar) * (y[j+1] - y_bar)))) end
         end
     end
-    beta   # 130 x 130
+    beta   # length 130 x 130
 end
 
 beta = find_beta(x, y, x_mid, y_mid)
 
-
-
 # Find Aij
+# rijs, sin_cos_theta, beta
 
 function find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
     n = length(x) - 1  # 130
     A = zeros(n+1, n+1)   # 131 x 131
-
+    
     # These for loops give us the values for the 130 x 129 matrix
     val = zeros(n, 130)
     for i in 1:n
@@ -148,23 +171,23 @@ function find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
             A[i, j] = log(r_ij[i, j+1]/r_ij[i, j]) * sin_theta_ij[i] + beta[i] * cos_theta_ij[i]
             val[i, j] = log(r_ij[i, j+1]/r_ij[i, j]) * cos_theta_ij[i] - beta[i] * sin_theta_ij[i]
         end
-        A[i, n+1] = sum(val[i, :]) 
+        A[i, n+1] = sum(val[i, :])  # YES
     end
 
     # This supposedly gives us the 131st row  (A_N+1,j)
     for j in 1:n
-        sin_theta_k1 = sin_theta_ij[1, j]
-        cos_theta_k1 = cos_theta_ij[1, j]
-        sin_theta_kn = sin_theta_ij[n, j]
-        cos_theta_kn = cos_theta_ij[n, j]
-
-        betak1 = beta[1, j]
-        betakn = beta[n, j]
-
-        r1j = r_ij[1, j]
-        rnj = r_ij[n, j]
-        r1j1 = r_ij[1, j+1]
-        rnj1 = r_ij[1, j+1]
+        sin_theta_k1 = sin_theta[1] * sin_theta[j] - cos_theta[1] * cos_theta[j]
+        cos_theta_k1 = cos_theta[1] * cos_theta[j] + sin_theta[1] * sin_theta[j]
+        sin_theta_kn = sin_theta[n] * sin_theta[j] - cos_theta[n] * cos_theta[j]
+        cos_theta_kn = cos_theta[n] * cos_theta[j] + sin_theta[n] * sin_theta[j]
+        
+        betak1 = if (j == 1) betak1 = π else beta[1, j] = (atan(((x[j] - x_mid[1]) * (y[j+1] - y_mid[1]) - (y[j] - y_mid[1]) * (x[j+1] - x_mid[1])) , ((x[j] - x_mid[1]) * (x[j+1] - x_mid[1]) + (y[j] - y_mid[1]) * (y[j+1] - y_mid[1])))) end
+        betakn = if (j == n) betakn = π else beta[n, j] = (atan(((x[j] - x_mid[n]) * (y[j+1] - y_mid[n]) - (y[j] - y_mid[n]) * (x[j+1] - x_mid[n])) , ((x[j] - x_mid[n]) * (x[j+1] - x_mid[n]) + (y[j] - y_mid[n]) * (y[j+1] - y_mid[n])))) end
+    
+        r1j = sqrt((x_mid[1] - x[j])^2 + (y_mid[1] - y[j])^2)
+        rnj = sqrt((x_mid[n] - x[j])^2 + (y_mid[n] - y[j])^2)
+        r1j1 = sqrt((x_mid[1] - x[j+1])^2 + (y_mid[1] - y[j+1])^2)
+        rnj1 = sqrt((x_mid[n] - x[j+1])^2 + (y_mid[n] - y[j+1])^2)
     
         k1 = betak1 * sin_theta_k1 - log(r1j1 / r1j) * cos_theta_k1
         kn = betakn * sin_theta_kn - log(rnj1 / rnj) * cos_theta_kn
@@ -175,18 +198,18 @@ function find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
     # Gives us (A_n+1,n+1)
     next = zeros(2, 130)
     for j in 1:n
-        sin_theta_k1 = sin_theta_ij[1, j]
-        cos_theta_k1 = cos_theta_ij[1, j]
-        sin_theta_kn = sin_theta_ij[n, j]
-        cos_theta_kn = cos_theta_ij[n, j]
-
-        betak1 = beta[1, j]
-        betakn = beta[n, j]
-
-        r1j = r_ij[1, j]
-        rnj = r_ij[n, j]
-        r1j1 = r_ij[1, j+1]
-        rnj1 = r_ij[1, j+1]
+        sin_theta_k1 = sin_theta[1] * sin_theta[j] - cos_theta[1] * cos_theta[j]
+        cos_theta_k1 = cos_theta[1] * cos_theta[j] + sin_theta[1] * sin_theta[j]
+        sin_theta_kn = sin_theta[n] * sin_theta[j] - cos_theta[n] * cos_theta[j]
+        cos_theta_kn = cos_theta[n] * cos_theta[j] + sin_theta[n] * sin_theta[j]
+        
+        betak1 = if (j == 1) betak1 = π else beta[1, j] = (atan(((x[j] - x_mid[1]) * (y[j+1] - y_mid[1]) - (y[j] - y_mid[1]) * (x[j+1] - x_mid[1])) , ((x[j] - x_mid[1]) * (x[j+1] - x_mid[1]) + (y[j] - y_mid[1]) * (y[j+1] - y_mid[1])))) end
+        betakn = if (j == n) betakn = π else beta[n, j] = (atan(((x[j] - x_mid[n]) * (y[j+1] - y_mid[n]) - (y[j] - y_mid[n]) * (x[j+1] - x_mid[n])) , ((x[j] - x_mid[n]) * (x[j+1] - x_mid[n]) + (y[j] - y_mid[n]) * (y[j+1] - y_mid[n])))) end
+    
+        r1j = sqrt((x_mid[1] - x[j])^2 + (y_mid[1] - y[j])^2)
+        rnj = sqrt((x_mid[n] - x[j])^2 + (y_mid[n] - y[j])^2)
+        r1j1 = sqrt((x_mid[1] - x[j+1])^2 + (y_mid[1] - y[j+1])^2)
+        rnj1 = sqrt((x_mid[n] - x[j+1])^2 + (y_mid[n] - y[j+1])^2)
     
         next[1, j] = betak1 * cos_theta_k1 + log(r1j1 / r1j) * sin_theta_k1
         next[2, j] = betakn * cos_theta_kn + log(rnj1 / rnj) * sin_theta_kn
@@ -194,7 +217,7 @@ function find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
 
     k1 = sum(next[1, :])
     kn = sum(next[2, :])
-
+    
     A[n+1, n+1] = k1 + kn
 
     return A
@@ -202,7 +225,9 @@ end
 
 A = find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
 
-# Find b vector (boundary conditions)
+# Freestream Velocity and AoA
+V_inf = 10.00
+alpha = 5.0 * (180/pi)
 
 function find_b(sin_theta, cos_theta, V_inf, alpha)
     n = length(x) - 1  # 131
@@ -211,7 +236,7 @@ function find_b(sin_theta, cos_theta, V_inf, alpha)
     for i in 1:n
         b[i] = 2 * π * V_inf * (sin_theta[i] * sin(alpha) - cos_theta[i] * cos(alpha))
     end
-
+    
     b[n+1] = -2 * π * V_inf * ((cos_theta[1] * cos(alpha) + sin_theta[1] * sin(alpha)) + (cos_theta[n] * cos(alpha) + sin_theta[n] * sin(alpha)))
 
     return b
@@ -221,8 +246,6 @@ b = find_b(sin_theta, cos_theta, V_inf, alpha) # 131
 
 q_gamma = A \ b
 
-
-# Find tangential velocity at each panel
 
 function find_vt(x, r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
     n = length(x) - 1
@@ -242,16 +265,22 @@ end
 
 Vti = find_vt(x, r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
 
-# Find CP for each point
-
-function cpressure(Vti)
+function cp(Vti)
     n = length(Vti)
-    CP = zeros(n)
+    Cp = zeros(n)
 
     for i in 1:n
-        CP[i] = 1 - (Vti[i]/ V_inf)^2
+        Cp[i] = 1 - (Vti[i]/ V_inf) ^2
     end
-    CP
+    Cp
 end
 
-CP = cpressure(Vti)
+Cp = cp(Vti)
+
+function plot_coordinates()
+    plot(x, y, marker = (:circle, 2), line = :solid, aspect_ratio=:equal, label = "coordinates", title = "NACA 0012")
+    scatter!(x_mid, y_mid, marker = (:square, 1), label = "midpoints")
+    png("naca0012plot")
+end
+
+plot_coordinates()
