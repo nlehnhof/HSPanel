@@ -19,11 +19,11 @@ MATH
 
 =#
 
-using Plots
+using Plots, LinearAlgebra
 
 # Freestream Velocity and AoA
 alpha = 3 * pi/180
-V_inf = 1.0
+V_inf = 10.0
 
 function get_coordinates(file)
     x, y = open(file, "r") do f
@@ -61,22 +61,26 @@ function plot_coordinates()
     scatter!(x_mid, y_mid, marker = (:square, 1), label = "midpoints")
 end
 
-# Find the distance from each midpoint to every other midpoint
-# Because we chose to model control points at the center of the panels rather than at the center of the surface they are easily computed. The methodology doesn't actually need \theta but rather sin \theta and cos \theta.
-
-function sin_cos_theta(x, y)
-    n = length(x)
-    sin_theta = zeros(n - 1)
-    cos_theta = zeros(n - 1)
-
-    for i in 1:n-1
-        sin_theta[i] = (y[i + 1] - y[i]) / sqrt((x[i + 1] + x[i])^2 + (y[i + 1] + y[i])^2)
-        cos_theta[i] = (x[i + 1] - x[i]) / sqrt((x[i + 1] + x[i])^2 + (y[i + 1] + y[i])^2)
+function find_length(x, y)
+    n = length(x) - 1
+    l = Vector{}(undef, n)
+    distance = zeros(n)
+    sin_theta = zeros(n)
+    cos_theta = zeros(n)
+    for i in 1:n
+        l[i] = [x[i+1] - x[i], y[i+1] - y[i]]
+        distance[i] = sqrt((x[i+1] - x[i])^2 + (y[i+1] - y[i])^2)
+        sin_theta[i] = (y[i+1] - y[i]) / distance[i]
+        cos_theta[i] = (x[i+1] - x[i]) / distance[i]
     end
-    sin_theta, cos_theta
+    l, distance, sin_theta, cos_theta
 end
 
-sin_theta, cos_theta = sin_cos_theta(x, y)
+l, distance, sin_theta, cos_theta = find_length(x, y)
+
+# Find the distance from each midpoint to every other midpoint
+# Because we chose to model control points at the center of the panels rather than at the center of the surface they are easily computed. The methodology doesn't actually need \theta but rather sin \theta and cos \theta.
+# All works up to this point and has been confirmed
 
 # We can now write our boundary conditions in equation form.
 # Flow tangency condition is V dot n_hat = 0
@@ -99,7 +103,7 @@ end
 
 r_ij = find_rijs(x, y, x_mid, y_mid)
 
-# Find sin(theta i - theta j) etc.
+# # Find sin(theta i - theta j) etc.
 
 function find_thetas(x, y, sin_theta, cos_theta)
     n = length(x)
@@ -122,18 +126,14 @@ function find_beta(x, y, x_mid, y_mid)
     n = length(x)
     beta = zeros(n-1, n-1)
     for i in 1:n-1
-        x_bar = x_mid[i]
-        y_bar = y_mid[i]
         for j in 1:n-1
-            if (j == i) beta[i, j] = π else beta[i, j] = (atan(((x[j] - x_bar) * (y[j+1] - y_bar) - (y[j] - y_bar) * (x[j+1] - x_bar)) , ((x[j] - x_bar) * (x[j+1] - x_bar) + (y[j] - y_bar) * (y[j+1] - y_bar)))) end
+            if (j == i) beta[i, j] = π else beta[i, j] = (atan(((x[j] - x_mid[i]) * (y[j+1] - y_mid[i]) - (y[j] - y_mid[i]) * (x[j+1] - x_mid[i])) , ((x[j] - x_mid[i]) * (x[j+1] - x_mid[i]) + (y[j] - y_mid[i]) * (y[j+1] - y_mid[i])))) end
         end
     end
     beta   # 130 x 130
 end
 
-beta = find_beta(x, y, x_mid, y_mid)
-
-
+beta = find_beta(x, y, x_mid, y_mid)  # CORRECT
 
 # Find Aij
 
@@ -145,8 +145,8 @@ function find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
     val = zeros(n, 130)
     for i in 1:n
         for j in 1:n
-            A[i, j] = log(r_ij[i, j+1]/r_ij[i, j]) * sin_theta_ij[i] + beta[i] * cos_theta_ij[i]
-            val[i, j] = log(r_ij[i, j+1]/r_ij[i, j]) * cos_theta_ij[i] - beta[i] * sin_theta_ij[i]
+            A[i, j] = log(r_ij[i, j+1]/r_ij[i, j]) * sin_theta_ij[i, j] + beta[i, j] * cos_theta_ij[i, j]
+            val[i, j] = log(r_ij[i, j+1]/r_ij[i, j]) * cos_theta_ij[i, j] - beta[i, j] * sin_theta_ij[i, j]
         end
         A[i, n+1] = sum(val[i, :]) 
     end
@@ -221,7 +221,6 @@ b = find_b(sin_theta, cos_theta, V_inf, alpha) # 131
 
 q_gamma = A \ b
 
-
 # Find tangential velocity at each panel
 
 function find_vt(x, r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
@@ -232,26 +231,25 @@ function find_vt(x, r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alph
 
     for i in 1:n
         for j in 1:n
-            set1[i, j] = q_gamma[i] * (beta[i, j] * sin_theta_ij[i, j] - log(r_ij[i, j+1] / r_ij[i, j]) * cos_theta_ij[i, j])
+            set1[i, j] = q_gamma[j] * (beta[i, j] * sin_theta_ij[i, j] - log(r_ij[i, j+1] / r_ij[i, j]) * cos_theta_ij[i, j])
             set2[i, j] = beta[i, j] * cos_theta_ij[i, j] + log(r_ij[i, j+1] / r_ij[i, j]) * sin_theta_ij[i, j] 
         end
-        Vti[i] = V_inf * (cos_theta[i] * cos(alpha) + sin_theta[i] * sin(alpha)) - (1/(2π)) * sum(set1[i,:]) + (q_gamma[end]/(2π)) * sum(set2[i,:])
+        Vti[i] = V_inf * (cos_theta[i] * cos(alpha) + sin_theta[i] * sin(alpha)) + (1/(2π)) * sum(set1[i,:]) + (q_gamma[end]/(2π)) * sum(set2[i,:])
     end
     Vti
 end
 
 Vti = find_vt(x, r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
 
+# print(Vti)
+
 # Find CP for each point
 
 function cpressure(Vti)
-    n = length(Vti)
-    CP = zeros(n)
-
-    for i in 1:n
-        CP[i] = 1 - (Vti[i]/ V_inf)^2
-    end
-    CP
+    CP = 1 .- (Vti ./ V_inf) .^2
 end
 
 CP = cpressure(Vti)
+
+
+# We have a problem. CP is mostly negative, but should be half negative and half positive
