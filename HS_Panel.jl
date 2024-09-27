@@ -202,6 +202,9 @@ end
 
 A = find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
 
+# println(A[131, 1:5])
+# println(A[131, 127:131])
+
 # Find b vector (boundary conditions)
 
 function find_b(sin_theta, cos_theta, V_inf, alpha)
@@ -221,13 +224,14 @@ b = find_b(sin_theta, cos_theta, V_inf, alpha) # 131
 
 q_gamma = A \ b
 
+
 # Find tangential velocity at each panel
 
 function find_vt(x, r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
     n = length(x) - 1
     Vti = zeros(n)
-    set1 = zeros(n+1, n+1)
-    set2 = zeros(n+1, n+1)
+    set1 = zeros(n, n)
+    set2 = zeros(n, n)
 
     for i in 1:n
         for j in 1:n
@@ -244,15 +248,14 @@ Vti = find_vt(x, r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
 # Find CP for each point
 
 function cpressure(Vti)
-    yes = Vti ./ V_inf
     CP = 1 .- (Vti ./ V_inf) .^2
+    return CP
 end
 
 CP = cpressure(Vti)
+print(CP)
 
-c = x_mid ./ 1
-
-plot(c, CP)
+plot(x_mid, CP)
 
 # We have a problem. CP is mostly negative, but should be half negative and half positive
 
