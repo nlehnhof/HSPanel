@@ -22,7 +22,7 @@ MATH
 using Plots
 
 # Freestream Velocity and AoA
-alpha = 3.0 * pi/180
+alpha = 0.0 * pi/180
 V_inf = 10.0
 
 function get_coordinates(file)
@@ -103,7 +103,7 @@ end
 
 r_ij = find_rijs(x, y, x_mid, y_mid)
 
-# # Find sin(theta i - theta j) etc.
+# Find sin(theta i - theta j) etc.
 
 function find_thetas(x, y, sin_theta, cos_theta)
     n = length(x)
@@ -197,11 +197,10 @@ function find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
 
     A[n+1, n+1] = k1 + kn
 
-    return A
+    return A 
 end
 
 A = find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
-
 
 # Find b vector (boundary conditions)
 
@@ -242,17 +241,18 @@ end
 
 Vti = find_vt(x, r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
 
-
 # Find CP for each point
 
 function cpressure(Vti)
-    # yes = Vti ./ V_inf
+    yes = Vti ./ V_inf
     CP = 1 .- (Vti ./ V_inf) .^2
 end
 
 CP = cpressure(Vti)
-print(CP)
 
-plot(x_mid, CP)
+c = x_mid ./ 1
+
+plot(c, CP)
 
 # We have a problem. CP is mostly negative, but should be half negative and half positive
+
