@@ -19,10 +19,10 @@ MATH
 
 =#
 
-using Plots, LinearAlgebra
+using Plots
 
 # Freestream Velocity and AoA
-alpha = 3 * pi/180
+alpha = 3.0 * pi/180
 V_inf = 10.0
 
 function get_coordinates(file)
@@ -90,11 +90,11 @@ l, distance, sin_theta, cos_theta = find_length(x, y)
 # Find rijs...
 
 function find_rijs(x, y, x_mid, y_mid)  # lengths: 131, 131, 130, 130
-    n = length(x)
-    r_ij = zeros(Float64, n-1, n)
+    n = length(x)-1
+    r_ij = zeros(Float64, n, n+1)
 
-    for i in 1:n-1
-        for j in 1:n
+    for i in 1:n
+        for j in 1:n+1
             r_ij[i, j] = sqrt((x_mid[i] - x[j])^2 + (y_mid[i] - y[j])^2)
         end
     end
@@ -123,10 +123,10 @@ sin_theta_ij, cos_theta_ij = find_thetas(x, y, sin_theta, cos_theta)
 # Find Beta
 
 function find_beta(x, y, x_mid, y_mid)
-    n = length(x)
-    beta = zeros(n-1, n-1)
-    for i in 1:n-1
-        for j in 1:n-1
+    n = length(x) -1
+    beta = zeros(n, n)
+    for i in 1:n
+        for j in 1:n
             if (j == i) beta[i, j] = π else beta[i, j] = (atan(((x[j] - x_mid[i]) * (y[j+1] - y_mid[i]) - (y[j] - y_mid[i]) * (x[j+1] - x_mid[i])) , ((x[j] - x_mid[i]) * (x[j+1] - x_mid[i]) + (y[j] - y_mid[i]) * (y[j+1] - y_mid[i])))) end
         end
     end
@@ -173,7 +173,7 @@ function find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
     end
 
     # Gives us (A_n+1,n+1)
-    next = zeros(2, 130)
+    next = zeros(2, n)
     for j in 1:n
         sin_theta_k1 = sin_theta_ij[1, j]
         cos_theta_k1 = cos_theta_ij[1, j]
@@ -201,6 +201,7 @@ function find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
 end
 
 A = find_A(x, y, x_mid, y_mid, r_ij, sin_theta_ij, cos_theta_ij, beta)
+
 
 # Find b vector (boundary conditions)
 
@@ -241,15 +242,17 @@ end
 
 Vti = find_vt(x, r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
 
-# print(Vti)
 
 # Find CP for each point
 
 function cpressure(Vti)
+    # yes = Vti ./ V_inf
     CP = 1 .- (Vti ./ V_inf) .^2
 end
 
 CP = cpressure(Vti)
+print(CP)
 
+plot(x_mid, CP)
 
 # We have a problem. CP is mostly negative, but should be half negative and half positive
