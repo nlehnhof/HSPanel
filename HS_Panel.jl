@@ -25,23 +25,23 @@ using Plots
 alpha = 0.0 * pi/180
 V_inf = 10.0
 
-# function get_coordinates(file)
-#     x, y = open(file, "r") do f
-#         x = Float64[]
-#         y = Float64[]
-#         for line in eachline(f)
-#             entries = split(chomp(line))
-#             push!(x, parse(Float64, entries[1]))
-#             push!(y, parse(Float64, entries[2]))
-#         end
-#         x, y
-#     end
-# end
+function get_coordinates(file)
+    x, y = open(file, "r") do f
+        x = Float64[]
+        y = Float64[]
+        for line in eachline(f)
+            entries = split(chomp(line))
+            push!(x, parse(Float64, entries[1]))
+            push!(y, parse(Float64, entries[2]))
+        end
+        x, y
+    end
+end
 
-# x, y = get_coordinates("naca0012.txt")
+x, y = get_coordinates("naca0012.txt")
 
-x = [1.0, 0.5, 0.0, 0.5, 1.0]
-y = [0.0, -0.5, 0.0, 0.5, 0.0]
+# x = [1.0, 0.5, 0.0, 0.5, 1.0]
+# y = [0.0, -0.25, 0.0, 0.25, 0.0]
 
 function find_midpoints(x, y)
     # Initialize new variables for midpoints
@@ -152,7 +152,6 @@ function find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
             A[i, j] = log(r_ij[i, j+1]/r_ij[i, j]) * sin_theta_ij[i, j] + beta[i, j] * cos_theta_ij[i, j]
             A[i,end] += log(r_ij[i, j+1]/r_ij[i, j]) * cos_theta_ij[i, j] - beta[i, j] * sin_theta_ij[i, j]
         end
-        #A[i, n+1] = sum(val[i, :]) 
     end
 
     # This supposedly gives us the 131st row  (A_N+1,j)
@@ -218,27 +217,36 @@ end
 
 b = find_b(sin_theta, cos_theta, V_inf, alpha) # 131
 
+# print(A)
 q_gamma = A \ b
 
+# println(A)
+# println(b)
+# println(q_gamma)
 
 # Find tangential velocity at each panel
 
 function find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
-    Vti = similar(q_gamma, length(q_gamma)-1)
-    
-    set1 = 0.0
-    set2 = 0.0
+    Vti = zeros(length(q_gamma)-1)
+
     for i in eachindex(q_gamma[1:end-1])
+        set1 = 0.0
+        set2 = 0.0
         for j in eachindex(q_gamma[1:end-1])
             set1 += q_gamma[j] * (beta[i, j] * sin_theta_ij[i, j] - log(r_ij[i, j+1] / r_ij[i, j]) * cos_theta_ij[i, j])
             set2 += beta[i, j] * cos_theta_ij[i, j] + log(r_ij[i, j+1] / r_ij[i, j]) * sin_theta_ij[i, j] 
         end
-        Vti[i] = V_inf * (cos_theta[i] * cos(alpha) + sin_theta[i] * sin(alpha)) + (1/(2π)) * set1 + (q_gamma[end]/(2π)) * set2
+        Vti[i] = V_inf * (cos_theta[i] * cos(alpha) + sin_theta[i] * sin(alpha)) + (set1 / (2π)) + (q_gamma[end]/(2π)) * set2
     end
     Vti
 end
 
+# end
+
 Vti = find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
+print(Vti)
+
+plot(x_mid, Vti, markers = true)
 
 # Find CP for each point
 
@@ -247,11 +255,7 @@ function cpressure(Vti)
     return CP
 end
 
-print(CP)
-
 CP = cpressure(Vti)
 
-
-# print(x_mid)
-
-plot(x_mid, CP, marker = true)
+# plot(x, y, markers = true)
+plot(x_mid, -CP, markers = true)
