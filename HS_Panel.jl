@@ -1,47 +1,26 @@
-#=
-
-Hess-Smith panel method is a numberical technique used in computational
-fluid dynamics to analyze fluid flow about a body. In this example, we use an airfoil (NACA0012).
-
-SET UP
-1. Input Airfoil coordinates
-2. Plot airfoil coordinates
-3. Plot airfoil panels using the airfoil coordinates
-4. Find midpoint-coordinates for each panel
-
-MATH
-5. Calculate influences - find how each panel vortex influences every other panel vortex
-6. Input Boundary Conditions
-7. Set up systems of equations (matrix) -- should have N + 1 equations where N = number of panels (one equation for every panel + 1 for Kutta condition)
-8. Solve systems of equations to find the source strength of each point and our circulation strenght (gamma)
-9. Find the tangential velocity at each panel
-10. Find the Coefficient of Pressure at each point (x_mid, y_mid)
-
-=#
-
 using Plots
 
 # Freestream Velocity and AoA
 alpha = 0.0 * pi/180
 V_inf = 10.0
 
-function get_coordinates(file)
-    x, y = open(file, "r") do f
-        x = Float64[]
-        y = Float64[]
-        for line in eachline(f)
-            entries = split(chomp(line))
-            push!(x, parse(Float64, entries[1]))
-            push!(y, parse(Float64, entries[2]))
-        end
-        x, y
-    end
-end
+# function get_coordinates(file)
+#     x, y = open(file, "r") do f
+#         x = Float64[]
+#         y = Float64[]
+#         for line in eachline(f)
+#             entries = split(chomp(line))
+#             push!(x, parse(Float64, entries[1]))
+#             push!(y, parse(Float64, entries[2]))
+#         end
+#         x, y
+#     end
+# end
 
-x, y = get_coordinates("naca0012.txt")
+# x, y = get_coordinates("naca0012.txt")
 
-# x = [1.0, 0.5, 0.0, 0.5, 1.0]
-# y = [0.0, -0.25, 0.0, 0.25, 0.0]
+x = [1.0, 0.5, 0.0, 0.5, 1.0]
+y = [0.0, -0.25, 0.0, 0.25, 0.0]
 
 function find_midpoints(x, y)
     # Initialize new variables for midpoints
@@ -59,27 +38,27 @@ end
 
 x_mid, y_mid = find_midpoints(x, y)
 
-function plot_coordinates()
-    plot(x, y, marker = (:circle, 2), line = :solid, aspect_ratio=:equal, label = "coordinates", title = "NACA 0012")
-    scatter!(x_mid, y_mid, marker = (:square, 1), label = "midpoints")
-end
+# function plot_coordinates()
+#     plot(x, y, marker = (:circle, 2), line = :solid, aspect_ratio=:equal, label = "coordinates", title = "NACA 0012")
+#     scatter!(x_mid, y_mid, marker = (:square, 1), label = "midpoints")
+# end
 
 function find_length(x, y)
     n = length(x) - 1
     l = Vector{}(undef, n)
-    distance = zeros(n)
-    sin_theta = zeros(n)
-    cos_theta = zeros(n)
-    for i in eachindex(l)
+    distance = similar(x, length(x)-1)
+    sin_theta = similar(x, length(x)-1)
+    cos_theta = similar(x, length(x)-1)
+    for i in eachindex(distance)
         l[i] = [x[i+1] - x[i], y[i+1] - y[i]]
         distance[i] = sqrt((x[i+1] - x[i])^2 + (y[i+1] - y[i])^2)
         sin_theta[i] = (y[i+1] - y[i]) / distance[i]
         cos_theta[i] = (x[i+1] - x[i]) / distance[i]
     end
-    l, distance, sin_theta, cos_theta
+    sin_theta, cos_theta
 end
 
-l, distance, sin_theta, cos_theta = find_length(x, y)
+sin_theta, cos_theta = find_length(x, y)
 
 # Find the distance from each midpoint to every other midpoint
 # Because we chose to model control points at the center of the panels rather than at the center of the surface they are easily computed. The methodology doesn't actually need \theta but rather sin \theta and cos \theta.
@@ -105,6 +84,7 @@ function find_rijs(x, y, x_mid, y_mid)  # lengths: 131, 131, 130, 130
 end
 
 r_ij = find_rijs(x, y, x_mid, y_mid)
+# print(size(r_ij))
 
 # Find sin(theta i - theta j) etc.
 
@@ -217,36 +197,25 @@ end
 
 b = find_b(sin_theta, cos_theta, V_inf, alpha) # 131
 
-# print(A)
 q_gamma = A \ b
-
-# println(A)
-# println(b)
-# println(q_gamma)
 
 # Find tangential velocity at each panel
 
 function find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
-    Vti = zeros(length(q_gamma)-1)
-
+    Vti = similar(q_gamma, length(q_gamma)-1)
+    set1 = 0.0
+    set2 = 0.0
     for i in eachindex(q_gamma[1:end-1])
-        set1 = 0.0
-        set2 = 0.0
         for j in eachindex(q_gamma[1:end-1])
             set1 += q_gamma[j] * (beta[i, j] * sin_theta_ij[i, j] - log(r_ij[i, j+1] / r_ij[i, j]) * cos_theta_ij[i, j])
             set2 += beta[i, j] * cos_theta_ij[i, j] + log(r_ij[i, j+1] / r_ij[i, j]) * sin_theta_ij[i, j] 
         end
-        Vti[i] = V_inf * (cos_theta[i] * cos(alpha) + sin_theta[i] * sin(alpha)) + (set1 / (2π)) + (q_gamma[end]/(2π)) * set2
+        Vti[i] = V_inf * (cos_theta[i] * cos(alpha)) + (set1 / (2π)) + (q_gamma[end]/(2π)) * set2
     end
     Vti
 end
 
-# end
-
 Vti = find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
-print(Vti)
-
-plot(x_mid, Vti, markers = true)
 
 # Find CP for each point
 
@@ -258,4 +227,25 @@ end
 CP = cpressure(Vti)
 
 # plot(x, y, markers = true)
-plot(x_mid, -CP, markers = true)
+# plot(x_mid, CP, yflip = true, markers = true)
+
+# #=
+
+# Hess-Smith panel method is a numberical technique used in computational
+# fluid dynamics to analyze fluid flow about a body. In this example, we use an airfoil (NACA0012).
+
+# SET UP
+# 1. Input Airfoil coordinates
+# 2. Plot airfoil coordinates
+# 3. Plot airfoil panels using the airfoil coordinates
+# 4. Find midpoint-coordinates for each panel
+
+# MATH
+# 5. Calculate influences - find how each panel vortex influences every other panel vortex
+# 6. Input Boundary Conditions
+# 7. Set up systems of equations (matrix) -- should have N + 1 equations where N = number of panels (one equation for every panel + 1 for Kutta condition)
+# 8. Solve systems of equations to find the source strength of each point and our circulation strenght (gamma)
+# 9. Find the tangential velocity at each panel
+# 10. Find the Coefficient of Pressure at each point (x_mid, y_mid)
+
+# =#
