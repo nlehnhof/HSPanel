@@ -4,23 +4,29 @@ using Plots
 alpha = 0.0 * pi/180
 V_inf = 10.0
 
-# function get_coordinates(file)
-#     x, y = open(file, "r") do f
-#         x = Float64[]
-#         y = Float64[]
-#         for line in eachline(f)
-#             entries = split(chomp(line))
-#             push!(x, parse(Float64, entries[1]))
-#             push!(y, parse(Float64, entries[2]))
-#         end
-#         x, y
-#     end
-# end
+function get_coordinates(file)
+    x, y = open(file, "r") do f
+        x = Float64[]
+        y = Float64[]
+        for line in eachline(f)
+            entries = split(chomp(line))
+            push!(x, parse(Float64, entries[1]))
+            push!(y, parse(Float64, entries[2]))
+        end
+        x, y
+    end
+end
 
-# x, y = get_coordinates("naca0012.txt")
+x, y = get_coordinates("naca0012.txt")
 
-x = [1.0, 0.5, 0.0, 0.5, 1.0]
-y = [0.0, -0.25, 0.0, 0.25, 0.0]
+# x = [1.0, 0.5, 0.0, 0.5, 1.0]
+# y = [0.0, -0.25, 0.0, 0.25, 0.0]
+
+# x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
+# y = [0.0, -0.125, -0.25, -0.125, 0.0, 0.125, 0.25, 0.125, 0.0]
+
+# x = [1.0, 0.9, 0.8, 0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+# y = [0.0,-0.05,-0.1,-0.15,-0.2,-0.25,-0.2,-0.15,-0.1,-0.05,0.0,0.05,0.1,0.15,0.2,0.25,0.2,0.15,0.1,0.5,0.0]
 
 function find_midpoints(x, y)
     # Initialize new variables for midpoints
@@ -72,9 +78,7 @@ sin_theta, cos_theta = find_length(x, y)
 # Find rijs...
 
 function find_rijs(x, y, x_mid, y_mid)  # lengths: 131, 131, 130, 130
-    n = length(x)-1
-    r_ij = zeros(Float64, n, n+1)
-
+    r_ij = similar(x_mid, length(x_mid), length(x_mid)+1)
     for i in eachindex(x_mid)
         for j in eachindex(x)
             r_ij[i, j] = sqrt((x_mid[i] - x[j])^2 + (y_mid[i] - y[j])^2)
@@ -134,8 +138,7 @@ function find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
         end
     end
 
-    # This supposedly gives us the 131st row  (A_N+1,j)
- 
+    # This gives us the 131st row  (A_N+1,j) 
     for j in eachindex(A[1,1:end-1])
         sin_theta_k1 = sin_theta_ij[1, j]
         cos_theta_k1 = cos_theta_ij[1, j]
@@ -156,7 +159,7 @@ function find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
         A[end, j] = k1 + kn
     end
 
-    # Gives us (A_n+1,n+1)
+    # Gives us A (n+1,n+1)
 
     for j in eachindex(A[1, 1:end-1])
         sin_theta_k1 = sin_theta_ij[1, j]
@@ -173,9 +176,8 @@ function find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
         rnj1 = r_ij[end, j+1]
     
         A[end, end] += betak1 * cos_theta_k1 + log(r1j1 / r1j) * sin_theta_k1
-        A[end, end] += betakn * cos_theta_kn + log(rnj1 / rnj) * sin_theta_kn
+        A[end, end] += betakn * cos_theta_kn + log(rnj1 / rnj) * sin_theta_kn 
     end
-
     return A 
 end
 
@@ -227,7 +229,7 @@ end
 CP = cpressure(Vti)
 
 # plot(x, y, markers = true)
-# plot(x_mid, CP, yflip = true, markers = true)
+plot(x_mid, CP, yflip = true, markers = true)
 
 # #=
 
@@ -248,4 +250,4 @@ CP = cpressure(Vti)
 # 9. Find the tangential velocity at each panel
 # 10. Find the Coefficient of Pressure at each point (x_mid, y_mid)
 
-# =#
+# =#=#
