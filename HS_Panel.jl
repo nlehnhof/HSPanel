@@ -120,7 +120,7 @@ function find_thetas(sin_theta, cos_theta)
     
     for i in eachindex(sin_theta)
         for j in eachindex(cos_theta)
-            sin_theta_ij[i, j] = sin_theta[i] * sin_theta[j] - cos_theta[i] * cos_theta[j]
+            sin_theta_ij[i, j] = sin_theta[i] * cos_theta[j] - cos_theta[i] * sin_theta[j]
             cos_theta_ij[i, j] = cos_theta[i] * cos_theta[j] + sin_theta[i] * sin_theta[j]
         end
     end
@@ -241,7 +241,7 @@ function find_b(sin_theta, cos_theta, V_inf, alpha)
     b = similar(sin_theta, length(sin_theta)+1)
 
     for i in eachindex(sin_theta)
-        b[i] = 2 * π * V_inf * (sin_theta[i] * sin(alpha) - cos_theta[i] * cos(alpha))
+        b[i] = 2 * π * V_inf * (sin_theta[i] * cos(alpha) - cos_theta[i] * sin(alpha))
     end
 
     b[end] = -2 * π * V_inf * ((cos_theta[1] * cos(alpha) + sin_theta[1] * sin(alpha)) + (cos_theta[end] * cos(alpha) + sin_theta[end] * sin(alpha)))
@@ -281,7 +281,41 @@ function cpressure(Vti, V_inf)
 end
 
 CP = cpressure(Vti, V_inf)
-println(CP)
 
-plot(x_mid, CP, markers = true)
+plot(x_mid, CP, yflip = true, markers = true)
 
+
+########### Validate with Joukowsky #################
+
+using FLOWFoil
+using Plots
+
+# - Parameters - #
+center = [-0.1; 0.1]
+radius = 1.0
+alpha = 4.0
+Vinf = 1.0
+
+# - Joukowsky Geometry - #
+x, y = FLOWFoil.AirfoilTools.joukowsky(center, radius)
+
+# - Surface Values - #
+surface_velocity, surface_pressure_coefficient, cl = FLOWFoil.AirfoilTools.joukowsky_flow(
+    center, radius, Vinf, alpha
+)
+
+# - Your Stuff - #
+
+# - Plot Stuff - #
+pl = plot(; xlabel="x", ylabel="cp", yflip=true)
+plot!(
+    pl,
+    x,
+    surface_pressure_coefficient;
+    linestyle=:dash,
+    linewidth=2,
+    label="Analytic Solution",
+)
+plot!(pl, x, your_cp, label="Hess-Smith")
+
+################################################
