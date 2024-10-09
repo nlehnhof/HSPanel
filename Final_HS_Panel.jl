@@ -256,7 +256,7 @@ function HS_Panel_CP(x, y, V_inf, alpha)
     =#
     # plcp = plot(x_mid, CP, yflip = true, markers = true)
 
-    return x_mid, CP
+    return CP
 end
 
 ########### Validate with Joukowsky #################
@@ -272,7 +272,7 @@ alpha = 4.0
 Vinf = 1.0
 
 # - Joukowsky Geometry - #
-x, y = FLOWFoil.AirfoilTools.joukowsky(center, radius, N = 720)
+x, y = FLOWFoil.AirfoilTools.joukowsky(center, radius)
 
 # - Surface Values - #
 surface_velocity, surface_pressure_coefficient, cl = FLOWFoil.AirfoilTools.joukowsky_flow(
@@ -280,18 +280,20 @@ surface_velocity, surface_pressure_coefficient, cl = FLOWFoil.AirfoilTools.jouko
 )
 
 # - Your Stuff - #
-x_mid, CP = HS_Panel_CP(x, y, Vinf, deg2rad(alpha)) 
+
+CP = HS_Panel_CP(x, y, Vinf, deg2rad(alpha))
 
 # - Plot Stuff - #
 pl = plot(; xlabel="x", ylabel="cp", yflip=true)
-# plot!(
-#     pl,
-#     x,
-#     surface_pressure_coefficient;
-#     linestyle=:dash,
-#     linewidth=2,
-#     label="Analytic Solution",
-# )
-plot!(pl, x_mid[2:end-1], CP[2:end-1], label="Hess-Smith")
+plot!(
+    pl,
+    x[1:342],
+    surface_pressure_coefficient[1:342];
+    linestyle=:dash,
+    linewidth=2,
+    label="Analytic Solution",
+)
+plot!(pl, x[1:358], CP[1:358], label="Hess-Smith")
 
-################################################
+# display(pl)
+savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
