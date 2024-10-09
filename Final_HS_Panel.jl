@@ -285,5 +285,5 @@ plot!(
 
 plot!(pl, x[1:360], CP[1:360], label="Hess-Smith")
 
-display(pl)
-# savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
+# display(pl)
+savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
