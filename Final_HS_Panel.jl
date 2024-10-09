@@ -16,7 +16,7 @@ using LinearAlgebra
 #     end
 # end
 
-# # x, y : vectors : coordinates of the body -- size(n+1)
+# x, y : vectors : coordinates of the body -- size(n+1)
 # x, y = get_coordinates("naca0008.txt")
 
 ########## Panel Method ###################
@@ -38,6 +38,7 @@ function HS_Panel_CP(x, y, V_inf, alpha)
         end
         return x_mid, y_mid
     end
+
 
     # Midpoints : vectors : Control points for each panel are located at the center of each panel -- length(n)
     x_mid, y_mid = find_midpoints(x, y)
@@ -119,8 +120,7 @@ function HS_Panel_CP(x, y, V_inf, alpha)
         # These for loops give us the values for the [n x n-1] matrix
         for i in eachindex(sin_theta_ij[:, 1])
             for j in eachindex(cos_theta_ij[1, :])
-                rs = r_ij[i, j+1] / r_ij[i, j]
-                A[i, j] = log(rs) * sin_theta_ij[i, j] + beta[i, j] * cos_theta_ij[i, j] 
+                A[i, j] = log(ℯ, r_ij[i, j+1] / r_ij[i, j]) * sin_theta_ij[i, j] + beta[i, j] * cos_theta_ij[i, j] 
 
                 # check to make sure the value is a real number
                 if any(isnan, A[i, j]) || any(isinf, A[i, j])
@@ -132,11 +132,8 @@ function HS_Panel_CP(x, y, V_inf, alpha)
 
         # Gives the values for the nth column 
         for i in eachindex(sin_theta_ij[:, 1])
-            A[i, end] = 0.0
             for j in eachindex(cos_theta_ij[1, :])
-                rs = r_ij[i, j+1] / r_ij[i, j]
-                A[i,end] += log(rs) * cos_theta_ij[i, j] - beta[i, j] * sin_theta_ij[i, j]
-                
+                A[i, end] += log(ℯ, r_ij[i, j+1] / r_ij[i, j]) * cos_theta_ij[i, j] - beta[i, j] * sin_theta_ij[i, j]
                 # check to make sure the value is a real number
                 if any(isnan, A[i, end]) || any(isinf, A[i, end])
                     println("$i , $j")
@@ -161,23 +158,21 @@ function HS_Panel_CP(x, y, V_inf, alpha)
             r1j1 = r_ij[1, j+1]
             rnj1 = r_ij[end, j+1]
         
-            k1 = betak1 * sin_theta_k1 - log(r1j1 / r1j) * cos_theta_k1
-            kn = betakn * sin_theta_kn - log(rnj1 / rnj) * cos_theta_kn
+            k1 = betak1 * sin_theta_k1 - log(ℯ, r1j1 / r1j) * cos_theta_k1
+            kn = betakn * sin_theta_kn - log(ℯ, rnj1 / rnj) * cos_theta_kn
 
             A[end, j] = k1 + kn
 
             if any(isnan, A[end, j]) || any(isinf, A[end, j])
                 error("A[end, j] contains NaN or Inf values.")
             end
-
         end
 
         # Gives us the [n+1,n+1] value
-        A[end, end] = 0.0
         for j in eachindex(A[1, 1:end-1])
             sin_theta_k1 = sin_theta_ij[1, j]
-            cos_theta_k1 = cos_theta_ij[1, j]
             sin_theta_kn = sin_theta_ij[end, j]
+            cos_theta_k1 = cos_theta_ij[1, j]
             cos_theta_kn = cos_theta_ij[end, j]
 
             betak1 = beta[1, j]
@@ -188,8 +183,7 @@ function HS_Panel_CP(x, y, V_inf, alpha)
             r1j1 = r_ij[1, j+1]
             rnj1 = r_ij[end, j+1]
         
-            A[end, end] += betak1 * cos_theta_k1 + log(r1j1 / r1j) * sin_theta_k1
-            A[end, end] += betakn * cos_theta_kn + log(rnj1 / rnj) * sin_theta_kn
+            A[end, end] = betakn * cos_theta_kn + log(rnj1 / rnj) * sin_theta_kn + betak1 * cos_theta_k1 + log(r1j1 / r1j) * sin_theta_k1
 
             # check to make sure the value is a real number
             if any(isnan, A[end, end]) || any(isinf, A[end, end])
@@ -229,10 +223,10 @@ function HS_Panel_CP(x, y, V_inf, alpha)
             set1 = 0.0
             set2 = 0.0
             for j in eachindex(q_gamma[1:end-1])
-                set1 += q_gamma[j] * (beta[i, j] * sin_theta_ij[i, j] - log(r_ij[i, j+1] / r_ij[i, j]) * cos_theta_ij[i, j])
-                set2 += beta[i, j] * cos_theta_ij[i, j] + log(r_ij[i, j+1] / r_ij[i, j]) * sin_theta_ij[i, j] 
+                set1 += q_gamma[j] * (beta[i, j] * sin_theta_ij[i, j] - log(ℯ, r_ij[i, j+1] / r_ij[i, j]) * cos_theta_ij[i, j])
+                set2 += beta[i, j] * cos_theta_ij[i, j] + log(ℯ, r_ij[i, j+1] / r_ij[i, j]) * sin_theta_ij[i, j] 
             end
-            Vti[i] = V_inf * cos_theta[i] * cos(alpha) + (set1 / (2π)) + (q_gamma[end]/(2π)) * set2
+            Vti[i] = V_inf * cos_theta[i] * cos(alpha) + (set1 / (2*π)) + (q_gamma[end]/(2*π)) * set2
         end
         return Vti
     end
@@ -249,17 +243,10 @@ function HS_Panel_CP(x, y, V_inf, alpha)
     # CP : vector : Coefficient of Pressure at each control point (midpoint of each panel) -- length(n)
     CP = cpressure(Vti, V_inf)
 
-    #= 
-    plot each coefficient of pressure at its corresponding panel control point (x_mid); 
-    flip the y_axis so the top curve is the upper surface and the bottom curve
-    is the lower surface for a positively cambered airfoil
-    =#
-    # plcp = plot(x_mid, CP, yflip = true, markers = true)
-
-    return CP
+    return x_mid, CP
 end
 
-########### Validate with Joukowsky #################
+########## Validate with Joukowsky #################
 
 using FLOWFoil
 using Plots
@@ -281,7 +268,9 @@ surface_velocity, surface_pressure_coefficient, cl = FLOWFoil.AirfoilTools.jouko
 
 # - Your Stuff - #
 
-CP = HS_Panel_CP(x, y, Vinf, deg2rad(alpha))
+alpha = deg2rad(alpha)
+
+x_mid, CP = HS_Panel_CP(x, y, Vinf, alpha)
 
 # - Plot Stuff - #
 pl = plot(; xlabel="x", ylabel="cp", yflip=true)
@@ -293,7 +282,8 @@ plot!(
     linewidth=2,
     label="Analytic Solution",
 )
-plot!(pl, x[1:358], CP[1:358], label="Hess-Smith")
 
-# display(pl)
-savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
+plot!(pl, x[1:360], CP[1:360], label="Hess-Smith")
+
+display(pl)
+# savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
