@@ -1,7 +1,7 @@
 using Plots
 
-x = [1.0, 0.5, 0.0]
-y = [0.0, -0.25, 0.0]
+# x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
+# y = [0.0, -0.125, -0.25, -0.125, 0.0, 0.125, 0.25, 0.125, 0.0]
 
 """
 find_midpoints(x::Vector, y::Vector)
@@ -28,9 +28,6 @@ function find_midpoints(x, y)
     return x_mid, y_mid
 end
 
-# Midpoints : vectors : Control points for each panel are located at the center of each panel -- length(n)
-# x_mid, y_mid = find_midpoints(x, y)
-
 """
     find_sin_cos(x, y)
 
@@ -42,7 +39,7 @@ julia> find_sin_cos([1.0, 0.5], [0.0, -0.25])
 ([-0.4472], [-0.8944])
 ```
 """
-function find_sin_cos(x, y)
+function find_sin_cos(x, y, x_mid)
     distance = similar(x_mid, length(x_mid))
     sin_theta = similar(x_mid, length(x_mid))
     cos_theta = similar(x_mid, length(x_mid))
@@ -57,9 +54,6 @@ function find_sin_cos(x, y)
     return sin_theta, cos_theta
 end
 
-# sin_theta, cos_theta : vectors : The sin and cos of each panel with respect to the x-axis -- length(n)
-# sin_theta, cos_theta = find_sin_cos(x, y)
-
 """
     find_rijs(x, y, x_mid, y_mid)
 
@@ -71,18 +65,15 @@ julia> find_rijs([1.0, 0.5], [0.0, -0.25], [0.75], [-0.125])
 [0.2795 0.2795]
 ```
 """
-function find_rijs(x, y, x_mid, y_mid)  # lengths: 131, 131, 130, 130
+function find_rijs(x, y, x_mid, y_mid)
     r_ij = similar(x_mid, length(x_mid), length(x_mid)+1)
     for i in eachindex(x_mid)
         for j in eachindex(x)
             r_ij[i, j] = sqrt((x_mid[i] - x[j])^2 + (y_mid[i] - y[j])^2)
         end
     end
-    return r_ij   # 130 x 131
+    return r_ij
 end
-
-# r_ij : matrix : Find the distance between the control point (mid_point) of panel i with respect to source points j and j+1 -- size(n, n+1)
-# r_ij = find_rijs(x, y, x_mid, y_mid)
 
 """
     find_thetas(sin_theta, cos_theta)
@@ -104,11 +95,8 @@ function find_thetas(sin_theta, cos_theta)
             cos_theta_ij[i, j] = cos_theta[i] * cos_theta[j] + sin_theta[i] * sin_theta[j]
         end
     end
-    return sin_theta_ij, cos_theta_ij   # 130 x 130 matrices
+    return sin_theta_ij, cos_theta_ij
 end
-
-# sin_theta_ij, cos_theta_ij : using sin_theta and cos_theta to find sin(theta[i] - theta[j]) and cos(theta[i] - theta[j])
-# sin_theta_ij, cos_theta_ij = find_thetas(sin_theta, cos_theta)
 
 """
     find_beta(x, y, x_mid, y_mid)
@@ -139,9 +127,6 @@ function find_beta(x, y, x_mid, y_mid)
     return beta
 end
 
-# beta : matrix : use coordinates and midpoints to find the angle between control point of panel i and source coordinates j and j+1 -- size(n, n)
-# beta = find_beta(x, y, x_mid, y_mid)
-
 """
     find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
 
@@ -163,11 +148,6 @@ function find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
     for i in eachindex(sin_theta_ij[:, 1])
         for j in eachindex(cos_theta_ij[1, :])
             A[i, j] = log(ℯ, r_ij[i, j+1] / r_ij[i, j]) * sin_theta_ij[i, j] + beta[i, j] * cos_theta_ij[i, j] 
-            # check to make sure the value is a real number
-            if any(isnan, A[i, j]) || any(isinf, A[i, j])
-                println("$i , $j")
-                error("A[i ,end] contains NaN or Inf values.")
-            end               
         end
     end
 
@@ -175,12 +155,6 @@ function find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
     for i in eachindex(sin_theta_ij[:, 1])
         for j in eachindex(cos_theta_ij[1, :])
             A[i, end] += log(ℯ, r_ij[i, j+1] / r_ij[i, j]) * cos_theta_ij[i, j] - beta[i, j] * sin_theta_ij[i, j]
-            # check to make sure the value is a real number
-            if any(isnan, A[i, end]) || any(isinf, A[i, end])
-                println("$i , $j")
-                println(A[i, end])
-                error("A[i ,end] contains NaN or Inf values.")
-            end
         end
     end
 
@@ -190,8 +164,10 @@ function find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
         cos_theta_k1 = cos_theta_ij[1, j]
         sin_theta_kn = sin_theta_ij[end, j]
         cos_theta_kn = cos_theta_ij[end, j]
+
         betak1 = beta[1, j]
         betakn = beta[end, j]
+        
         r1j = r_ij[1, j]
         rnj = r_ij[end, j]
         r1j1 = r_ij[1, j+1]
@@ -200,9 +176,6 @@ function find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
         k1 = betak1 * sin_theta_k1 - log(ℯ, r1j1 / r1j) * cos_theta_k1
         kn = betakn * sin_theta_kn - log(ℯ, rnj1 / rnj) * cos_theta_kn
         A[end, j] = k1 + kn
-        if any(isnan, A[end, j]) || any(isinf, A[end, j])
-            error("A[end, j] contains NaN or Inf values.")
-        end
     end
 
     # Gives us the [n+1,n+1] value
@@ -211,25 +184,19 @@ function find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
         sin_theta_kn = sin_theta_ij[end, j]
         cos_theta_k1 = cos_theta_ij[1, j]
         cos_theta_kn = cos_theta_ij[end, j]
+
         betak1 = beta[1, j]
         betakn = beta[end, j]
+        
         r1j = r_ij[1, j]
         rnj = r_ij[end, j]
         r1j1 = r_ij[1, j+1]
         rnj1 = r_ij[end, j+1]
     
         A[end, end] = betakn * cos_theta_kn + log(rnj1 / rnj) * sin_theta_kn + betak1 * cos_theta_k1 + log(r1j1 / r1j) * sin_theta_k1
-        
-        # check to make sure the value is a real number
-        if any(isnan, A[end, end]) || any(isinf, A[end, end])
-            error("A[end, end] contains NaN or Inf values.")
-        end
     end
     return A 
 end
-
-# A : the matrix that is the influence of every panel on every other panel -- size(n+1, n+1)
-# A = find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
 
 """
     find_b(sin_theta, cos_theta, V_inf, alpha)
@@ -276,8 +243,6 @@ function find_q_gamma(A, b)
     return q_gamma
 end
 
-# q_gamma = find_q_gamma(A, b)
-
 """
     find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
 
@@ -291,7 +256,7 @@ julia> find_vt([0.279508  0.279508  0.760345; 0.760345  0.279508  0.279508], [0.
  14.371494151562441
 ```
 """
-function find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
+function find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha, cos_theta, sin_theta)
     Vti = similar(q_gamma, length(q_gamma)-1)
     for i in eachindex(q_gamma[1:end-1])
         set1 = 0.0
@@ -300,13 +265,10 @@ function find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
             set1 += q_gamma[j] * (beta[i, j] * sin_theta_ij[i, j] - log(ℯ, r_ij[i, j+1] / r_ij[i, j]) * cos_theta_ij[i, j])
             set2 += beta[i, j] * cos_theta_ij[i, j] + log(ℯ, r_ij[i, j+1] / r_ij[i, j]) * sin_theta_ij[i, j] 
         end
-        Vti[i] = V_inf * cos_theta[i] * cos(alpha) + (set1 / (2*π)) + (q_gamma[end]/(2*π)) * set2
+        Vti[i] = V_inf * (cos_theta[i] * cos(alpha) + sin_theta[i] * sin(alpha)) + (set1 / (2*π)) + (q_gamma[end]/(2*π)) * set2
     end
     return Vti
 end
-
-# Vti : vector : finds the tangential velocity at each panel since we have a no-flow through condition so there is no normal velocity -- length(n)
-# Vti = find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, 10, 0.0)
 
 """
     cpressure(Vti, V_inf)
@@ -326,9 +288,6 @@ function cpressure(Vti, V_inf)
     return CP 
 end
 
-# CP : vector : Coefficient of Pressure at each control point (midpoint of each panel) -- length(n)
-# CP = cpressure(Vti, V_inf)
-
 """
     HS_Panel_CP(x, y, V_inf, alpha)
 
@@ -343,20 +302,29 @@ julia> HS_Panel_CP([1.0, 0.5, 0.0], [0.0, -0.25, 0.0], 10, 0.0)
 """
 function HS_Panel_CP(x, y, V_inf, alpha)
     x_mid, y_mid = find_midpoints(x, y)
-    sin_theta, cos_theta = find_sin_cos(x, y)
+
+    sin_theta, cos_theta = find_sin_cos(x, y, x_mid)
+    
     r_ij = find_rijs(x, y, x_mid, y_mid)
+    
     sin_theta_ij, cos_theta_ij = find_thetas(sin_theta, cos_theta)
+    
     beta = find_beta(x, y, x_mid, y_mid)
+    
     A = find_A(r_ij, sin_theta_ij, cos_theta_ij, beta)
+    
     b = find_b(sin_theta, cos_theta, V_inf, alpha)
+    
     q_gamma = A \ b
-    Vti = find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha)
+    
+    Vti = find_vt(r_ij, sin_theta_ij, cos_theta_ij, beta, q_gamma, V_inf, alpha, cos_theta, sin_theta)
+    
     CP = cpressure(Vti, V_inf)
 
-    return x_mid, CP
+    return x_mid, y_mid, CP
 end
 
-
+#=
 ########## Validate with Joukowsky #################
 
 import FLOWFoil.AirfoilTools as at
@@ -379,7 +347,7 @@ surface_velocity, surface_pressure_coefficient, cl = at.joukowsky_flow(
 
 alpha = deg2rad(alpha)
 
-x_mid, CP = HS_Panel_CP(x, y, Vinf, alpha)
+x_mid, y_mid, CP = HS_Panel_CP(x, y, Vinf, alpha)
 
 # - Plot Stuff - #
 pl = plot(; xlabel="x", ylabel="cp", yflip=true)
@@ -395,4 +363,6 @@ plot!(
 plot!(pl, x[1:360], CP[1:360], label="Hess-Smith")
 
 display(pl)
-# savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
+savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
+
+=#
