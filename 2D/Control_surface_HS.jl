@@ -8,61 +8,11 @@ Run Hess-Smith with new surface
 =#
 
 using Plots
-include("C:\\Users\\nlehn\\HSPanel\\revised_HS_Panel.jl")
+include("C:\\Users\\nlehn\\HSPanel\\HS_Panel_2.jl")
 
 
 x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
 y = [0.0, -0.125, -0.25, -0.125, 0.0, 0.125, 0.25, 0.125, 0.0]
-
-"""
-get_geometry(x_control_surface, y_control_surface)
-
-    get_geometry takes in the x and y coordinates of a body 
-    (airfoil) at a specific angle of attack and deflection angle
-    and returns the x-midpoints and theta of each panel
-
-# Arguments
-    x_control_surface::Vector y_control_surface::Vector
-    x_control_surface and y_control_surface are vectors 
-    where (x_control_surface[i], y_control_surface[i]) 
-    corresponds to the ith panel of the body
-
-# Returns
-    x_mid::Vector
-    y_mid::Vector
-    angle_of_panel::vector
-    Returns the vectors x_mid, y_mid, and angle_of_panel 
-    where (x_mid[i], y_mid[i]) are the coordinates of 
-    the midpoint of the ith panel and angle_of_panel[i] is 
-    the angle of the ith panel with respect to the x-axis
-
-# Example:
-```
-julia> x_control_surface = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
-julia> y_control_surface = [0.0, -0.125, -0.25, -0.125, 0.0, 0.125, 0.25, 0.125, 0.0]
-julia> x_mid, y_mid, angle_of_panel = get_geometry(x_control_surface, y_control_surface)
-([0.8690771033397395, 0.625, 0.375, 0.125, 0.125, 0.375, 0.625, 0.8690771033397395], [-0.051843363525808636, -0.1875, -0.1875, -0.0625, 0.0625, 0.1875, 0.1875, 0.07315663647419136], [-0.5253521943066973, -0.44838647994305775, 0.44838647994305775, 0.44838647994305775, 0.44838647994305775, 0.44838647994305775, -0.44838647994305775, -0.39990270559192903])
-```
-"""
-function get_geometry(x_control_surface, y_control_surface)
-    @assert length(x_control_surface) == length(y_control_surface) "length(x) does not equal length(y)."
-    x_mid = similar(x_control_surface, length(x_control_surface)-1) .* zeros(length(x_control_surface)-1)
-    y_mid = similar(y_control_surface, length(y_control_surface)-1) .* zeros(length(y_control_surface)-1)
-    # Find midpoints
-    for i in eachindex(x_mid)
-        x_mid[i] = 0.5 * (x_control_surface[i] + x_control_surface[i+1])
-        y_mid[i] = 0.5 * (y_control_surface[i] + y_control_surface[i+1])
-    end
-        
-    angle_of_panel = similar(x_mid, length(x_mid)) .* zeros(length(x_mid))
-    
-    for i in eachindex(x_mid)
-        distance = sqrt((x_control_surface[i+1] - x_control_surface[i])^2 + (y_control_surface[i+1] - y_control_surface[i])^2)
-        @assert distance > 0.0 "Distance must be positive and greater than 0.0. Points $i and $(i+1)."
-        angle_of_panel[i] = asin(y_control_surface[i+1] - y_control_surface[i]) / distance
-    end
-    return x_mid, y_mid, angle_of_panel
-end
 
 """
 change_deflection_angle(x, y, angle_of_control_surface, percent_of_chord, V_inf, alpha)
@@ -72,15 +22,18 @@ change_deflection_angle(x, y, angle_of_control_surface, percent_of_chord, V_inf,
     and the freestream velocity and angle of attack of the body.
 
 # Arguments
-    x::Vector (vector of the x-coordinates for the body)
-    y::Vector (vector of the y-coordinates for the body)
+    x::Vector(n+1) (vector of the x-coordinates for the body)
+    y::Vector(n+1) (vector of the y-coordinates for the body)
     angle_of_control_surface::Float64 (user-defined angle of the control surface)
     percent_of_chord::Float64 (user-defined point of the chord that is the start of the control surface)
     V_inf::Float64 (user-defined freestream velocity)
     alpha::Float64 (user-defined angle-of-attack of the body)
 
 # Returns
-    x_mid_CP, y_mid_CP, CP (all Vectors) --> these values are found by using the Hess-Smith Panel Method
+    x_mid_CP, y_mid_CP, tangential_velocity, CP (all Vectors of size n) --> these values are found by using the Hess-Smith Panel Method
+    x_control_surface::Vector(n)
+    y_control_surface::Vector(n)
+        Where (x_control_surface[i], y_control_surface[i]) corresponds to the ith panel of the body
 
 """
 function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chord, V_inf, alpha)
@@ -125,19 +78,18 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
         end
     end
 
-    # x_mid, y_mid, angle_of_panel = get_geometry(x_control_surface, y_control_surface)
-
-    x_mid_CP, y_mid_CP, CP = HS_Panel_CP(x_control_surface, y_control_surface, V_inf, alpha)
-    return x_mid_CP, y_mid_CP, CP
+    x, y, x_mid_CP, y_mid_CP, tangential_velocity, CP = HS_Panel_CP(x_control_surface, y_control_surface, V_inf, alpha)
+    
+    return x_control_surface, y_control_surface, x_mid_CP, y_mid_CP, tangential_velocity, CP
 end
 
 
-angle_of_control_surface = 0.0
+angle_of_control_surface = 5.0
 percent_of_chord = 0.75 
 V_inf = 1.0
 alpha = 0.0
 
-x_mid_CP, y_mid_CP, CP = change_deflection_angle(x, y, angle_of_control_surface, percent_of_chord, V_inf, alpha)
+x_control_surface, y_control_surface, x_mid_CP, y_mid_CP, tangential_velocity, CP = change_deflection_angle(x, y, angle_of_control_surface, percent_of_chord, V_inf, alpha)
 
 """
 plot_geometry()
@@ -145,12 +97,12 @@ plot_geometry()
     plots the original geometry of the body with 
     the new geometry of the body with its control surface
 
-# Inputs
+# Arguments
     (x, y) # Original body
     (x_control_surface, y_control_surface) # New body
     (x_mid_CP, y_mid_CP) # Panel midpoints on New body
 
-# Outputs
+# Returns
     Plot of the new body versus the old body
 """
 function plot_geometry()
@@ -162,16 +114,18 @@ function plot_geometry()
     display(pl)
 end
 
+# plot_geometry()
+
 """
 plot_CP()
 
     Plots the Coefficient of Pressure that corresponds to each panel.
 
-# Inputs
-    CP::Vector of the coefficients of pressures of each panel
-    x_mid_CP::Vector of the control points (midpoints) of each panel
+# Arguments
+    CP::Vector(n) of the coefficients of pressures of each panel
+    x_mid_CP::Vector(n) of the control points (midpoints) of each panel
 
-# Outputs
+# Returns
     Plot of the Coefficient of Pressure of the body with 
     the control surface deflection
 """
@@ -181,7 +135,5 @@ function plot_CP()
     # xlims!(pl1, 0.0, 1.0)
     # ylims!(pl1, -1.0, 1.0)
     display(pl1)
-    savefig("zero_degree_AoA_and_deflection_test.png")
+    # savefig("zero_degree_AoA_and_deflection_test.png")
 end
-
-plot_CP()
