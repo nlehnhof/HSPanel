@@ -49,13 +49,10 @@ See Fig. 2.28 on pg. 67 in Computational Aerodynamics by Dr. Ning
 function find_sin_cos_of_panel(x, y, x_mid)
     sin_panel = similar(x_mid, length(x_mid))
     cos_panel = similar(x_mid, length(x_mid))
-    for i in eachindex(distance)
+    for i in eachindex(sin_panel)
         distance = sqrt((x[i+1] - x[i])^2 + (y[i+1] - y[i])^2)
         sin_panel[i] = (y[i+1] - y[i]) / distance
         cos_panel[i] = (x[i+1] - x[i]) / distance
-        if distance == 0.0
-            error("Zero distance detected between points $i and $(i+1).")
-        end
     end
     return sin_panel, cos_panel
 end
@@ -165,58 +162,19 @@ See Eq. 2.223 and 2.233 and Fig. 2.234 on pg. 72 and 76 in Computational Aerodyn
     A::Matrix(n+1, n+1) that gives us the matrix of how each panel influences every other panel.
 """
 function find_A(r_panel, sin_angle_panels, cos_angle_panels, beta)
-    A = similar(r_panel, size(r_panel, 1) + 1, size(r_panel, 2))
+    A = similar(r_panel, size(r_panel, 1) + 1, size(r_panel, 2)) * 0.0
 
-    # These for loops give us the values for the [n x n-1] matrix
+    # These for loops give us the values for the [n x n] matrix
     for i in eachindex(sin_angle_panels[:, 1])
+        k1 = beta[1, i] * sin_angle_panels[1, i] - log(r_panel[1, i+1] / r_panel[1, i]) * cos_angle_panels[1, i]
+        kn = beta[end, i] * sin_angle_panels[end, i] - log(r_panel[end, i+1] / r_panel[end, i]) * cos_angle_panels[end, i]
+        A[end, i] = k1 + kn
+        A[end, end] = beta[end, i] * cos_angle_panels[end, i] + log(r_panel[end, i+1] / r_panel[end, i]) * sin_angle_panels[end, i] + beta[1, i] * cos_angle_panels[1, i] + log(r_panel[1, i+1] / r_panel[1, i]) * sin_angle_panels[1, i]
+
         for j in eachindex(cos_angle_panels[1, :])
             A[i, j] = log(r_panel[i, j+1] / r_panel[i, j]) * sin_angle_panels[i, j] + beta[i, j] * cos_angle_panels[i, j]
-        end
-    end
-
-    # Gives the values for the nth column 
-    for i in eachindex(sin_angle_panels[:, 1])
-        for j in eachindex(cos_angle_panels[1, :])
             A[i, end] += log(r_panel[i, j+1] / r_panel[i, j]) * cos_angle_panels[i, j] - beta[i, j] * sin_angle_panels[i, j]
         end
-    end
-
-    # This gives us the n+1 row
-    for j in eachindex(A[1, 1:end-1])
-        sin_panel_k1 = sin_angle_panels[1, j]
-        cos_panel_k1 = cos_angle_panels[1, j]
-        sin_panel_kn = sin_angle_panels[end, j]
-        cos_panel_kn = cos_angle_panels[end, j]
-
-        betak1 = beta[1, j]
-        betakn = beta[end, j]
-
-        r_panel_1_j = r_panel[1, j]
-        r_panel_n_j = r_panel[end, j]
-        r_panel_1_j1 = r_panel[1, j+1]
-        r_panel_n_j1 = r_panel[end, j+1]
-
-        k1 = betak1 * sin_panel_k1 - log(r_panel_1_j1 / r_panel_1_j) * cos_panel_k1
-        kn = betakn * sin_panel_kn - log(r_panel_n_j1 / r_panel_n_j) * cos_panel_kn
-        A[end, j] = k1 + kn
-    end
-
-    # Gives us the [n+1,n+1] value
-    for j in eachindex(A[1, 1:end-1])
-        sin_panel_k1 = sin_angle_panels[1, j]
-        sin_panel_kn = sin_angle_panels[end, j]
-        cos_panel_k1 = cos_angle_panels[1, j]
-        cos_panel_kn = cos_angle_panels[end, j]
-
-        betak1 = beta[1, j]
-        betakn = beta[end, j]
-
-        r_panel_1_j = r_panel[1, j]
-        r_panel_n_j = r_panel[end, j]
-        r_panel_1_j1 = r_panel[1, j+1]
-        r_panel_n_j1 = r_panel[end, j+1]
-
-        A[end, end] = betakn * cos_panel_kn + log(r_panel_n_j1 / r_panel_n_j) * sin_panel_kn + betak1 * cos_panel_k1 + log(r_panel_1_j1 / r_panel_1_j) * sin_panel_k1
     end
     return A
 end
@@ -246,9 +204,6 @@ function find_b(sin_panel, cos_panel, V_inf, alpha)
     b[end] = -2 * π * V_inf * ((cos_panel[1] * cos(alpha) + sin_panel[1] * sin(alpha)) + (cos_panel[end] * cos(alpha) + sin_panel[end] * sin(alpha)))
     return b
 end
-
-# b : vector that provides the boundary conditions -- length(n+1)
-# b = find_b(sin_panel, cos_panel, 10, 0.0) 
 
 """
     find_q_gamma(A, b)
@@ -373,10 +328,10 @@ function HS_Panel_CP(x, y, V_inf, alpha)
 
     CP = cpressure(tangential_velocity, V_inf)
 
-    return x, y, x_mid, y_mid, tangential_velocity, CP
+    return x, y, x_mid, y_mid, tangential_velocity, q_gamma, CP
 end
 
-#=
+
 ########## Validate with Joukowsky #################
 
 import FLOWFoil.AirfoilTools as at
@@ -399,7 +354,7 @@ surface_velocity, surface_pressure_coefficient, cl = at.joukowsky_flow(
 
 alpha = deg2rad(alpha)
 
-x, y, x_mid, y_mid, tangential_velocity, CP = HS_Panel_CP(x, y, Vinf, alpha)
+x, y, x_mid, y_mid, tangential_velocity, q_gamma, CP = HS_Panel_CP(x, y, Vinf, alpha)
 
 # - Plot Stuff - #
 pl = plot(; xlabel="x", ylabel="cp", yflip=true)
@@ -415,6 +370,4 @@ plot!(
 plot!(pl, x[1:360], CP[1:360], label="Hess-Smith")
 
 display(pl)
-savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
-
-=#
+# savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
