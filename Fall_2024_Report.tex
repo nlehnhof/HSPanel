@@ -1,0 +1,209 @@
+\documentclass[journal]{new-aiaa} % Use the most recent AIAA journal class (automates all the formatting for you)
+
+\usepackage[utf8]{inputenc} %use UTF-8 Encoding
+
+\usepackage{graphicx} % Needed to insert images into the document
+\graphicspath{{figures/}} % Sets the default location of pictures
+
+\usepackage{amsmath} %math formatting package
+
+\usepackage{longtable,tabularx} %table formatting packages
+
+
+
+
+% Insert your Title Here
+\title{FALL 2024 REPORT}
+
+% Insert your Name and Information Here
+\author{Nathan R. Lehnhof\footnote{Research Assistant, BYU FLOW Lab, Mechanical Engineering.}}
+\affil{Brigham Young University, Provo, Utah, 84606}
+
+
+
+\begin{document}
+
+\maketitle % This generates the title and author information in the document.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                    %
+%             ABSTRACT: WRITE THIS AFTER EVERYTHING ELSE             %
+%                                                                    %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{abstract}
+	
+	%%% --- Before/Motivation (WHY): --- %%%
+	
+	%% -- Context: Anyone Relates -- %%
+	% Questions to answer:
+	%    Why is the need so pressing or important? 
+	%    What is the current state?
+
+
+
+	%% -- Need: Readers Relate -- %%
+	% Questions to answer:
+	%    Why does anything need to be done? 
+	%    Why is it important to the reader?
+
+
+
+	%% -- Task: Author's Actions --%%
+	% Questions to answer:
+	%    What did you do to address the need?
+	%    Why were you able to?
+
+
+
+	%% -- Object: -- %%
+	% Questions to answer:
+	%    What does this paper present/cover? 
+	%    Why?
+	
+	
+	
+	%%% --- After/Outcome (WHAT): --- %%%
+		
+	%% -- Findings: -- %%
+	% Questions to answer:
+	%    What did the work done yield/reveal?
+	%    What did you find from the task?
+	%    What are the results?
+		
+		
+		
+	%% -- Conclusion: -- %%
+	% Questions to answer:
+	%    What does it mean for the audience?
+		
+		
+		
+	%% -- Perspectives: -- %%
+	% Questions to answer:
+	%    What should be done next, future work, etc.?
+	
+	
+
+\end{abstract}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                    %
+%                            INTRODUCTION                            %
+%                                                                    %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Introduction}
+\label{sec:intro}
+
+%% -- Paragraph 1:  Motivation -- %%
+% Questions to answer: 
+%    Why is the need so pressing or important? 
+%    What is the current state?
+Transcribing Files (ChatGPT, git, terminal)
+
+%% -- Paragraph 2:  Context -- %%
+% Questions to answer: 
+%    Why does anything need to be done? 
+%    Who has done what?
+%    Why is what has been done ``insufficient?''
+Hess-Smith Part 1
+
+%% -- Paragraph 3:  Paper Outline -- %%
+Hess-Smith Part 2
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                    %
+%                              METHODS                               %
+%                                                                    %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Methods}
+\label{sec:methods}
+
+% A lot of your initial method details will probably come from content in your theory exploration assignment.  Feel free to copy and paste from that assignment as needed.
+
+% Example of how to format your optimization problem in an equation format
+\begin{equation} %using the equation environment will add a number and allow you to reference it.
+\label{eqn:optimization_problem} %use this label to reference this equation
+	\begin{aligned}
+		\mathrm{minimize:~~} & (objective) \\ %Put your objective function here (minimize or maximize)
+		\mathrm{with~respect~to:~~} & (design~variables) \\ % list out your design variables here
+		\mathrm{such~that:~~} & (constraint1) \\ % constraints are usually < > =, ect.,
+					   & (constraint2) \\ % so it helps to put them on multiple lines
+					   %... etc.
+	\end{aligned}
+\end{equation}
+
+\noindent where [explain the various symbols and what they mean here.]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                    %
+%                              RESULTS                               %
+%                                                                    %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Results}
+\label{sec:results}
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                    %
+%                            CONCLUSION                              %
+%                                                                    %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Conclusions and Future Work}
+\label{sec:conclusions}
+
+
+
+%% -- Paragraph 1:  Conclusion -- %%
+% Questions to answer: 
+%    What was the goal of this project?
+%	 What was done to meet the goal?
+% 	 What were the major takeaways?
+
+
+%% -- Paragraph 2:  Future Work -- %%
+% Questions to answer: 
+%    What are the obvious next steps that were beyond the scope of this project? 
+%    What else might be done in the future to improve this project or extend it?
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                    %
+%                           BIBLIOGRAPHY                             %
+%                                                                    %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\bibliography{references}{} %all you need here is to put Bibtex entries in a file named references.bib, and things will automatically populate.
+\bibliographystyle{aiaa} %the .bst file provides the information for this format automatically, just make sure it's in the same folder as this file.
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                    %
+%                             APPEDICES                              %
+%                                                                    %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\appendix
+
+
+
+\end{document}
