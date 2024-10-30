@@ -59,13 +59,13 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
 end
 
 # change_deflection_angle(x, y, 10, 0.72, -0.5)
-x, y, x_control_surface, y_control_surface, x_position_of_rotation, y_position_of_rotation = change_deflection_angle(x, y, 10, 0.72, 1.0)
+x, y, x_control_surface, y_control_surface, x_position_of_rotation, y_position_of_rotation = change_deflection_angle(x, y, 45, 0.72, 0.0)
 
 # println(x_control_surface)
 # println(y_control_surface)
 
 function plot_geometry()
-    pl = plot(x, y, label = "Before", markers=true)
+    pl = plot(x, y, label = "Before", markers=true, aspect_ratio=1)
     title!("Lower Surface")
     scatter!(pl, (x_position_of_rotation, y_position_of_rotation), label="Coordinate of Rotation")
     plot!(pl, x_control_surface, y_control_surface, label="After", markers=true)

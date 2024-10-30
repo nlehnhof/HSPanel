@@ -323,6 +323,8 @@ function HS_Panel_CP(x, y, V_inf, alpha)
     return x, y, x_mid, y_mid, tangential_velocity, q_gamma, CP
 end
 
+HS_Panel_CP(x, y, 1.0, 0.0)
+
 
 ########## Validate with Joukowsky #################
 
