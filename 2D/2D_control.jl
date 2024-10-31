@@ -13,8 +13,10 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
     y_control_surface = similar(y, length(y)) * 0.0
     angle_of_control_surface = deg2rad(angle_of_control_surface)
 
+    coordinates = [ [xi, yi] for (xi, yi) in zip(x, y) ]
+
     # Sort points
-    sorted_indices = sortperm(x[1:round(Int, length(x)/2+1)])
+    sorted_indices = sortperm(x[1:round(Int, length(x)/2)])
     x_sorted = x[sorted_indices]
     y_sorted = y[sorted_indices]
 
@@ -22,53 +24,53 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
     x_position_of_rotation = percent_of_chord * x[1]
     interpolation = LinearInterpolation(x_sorted, y_sorted, extrapolation_bc=NaN)  # NaN for values outside the range
     y_position_of_rotation = abs(interpolation(x_position_of_rotation)) * (percent_of_thickness)
+    y_position_of_hinge = abs(interpolation(x_position_of_rotation))
 
     first = (x[end] * percent_of_chord)
     start_index = findmin(abs.(x .- first))[2]
-    
+    end_index = length(x)+2 - start_index
+
+    if x_position_of_rotation > (x[end] * percent_of_chord)
+        insert!(coordinates, start_index, [x_position_of_rotation, -y_position_of_hinge])
+        insert!(coordinates, end_index, [x_position_of_rotation, y_position_of_hinge])
+    else
+        insert!(coordinates, start_index+1, [x_position_of_rotation, -y_position_of_hinge])
+        insert!(coordinates, end_index, [x_position_of_rotation, y_position_of_hinge])
+    end
+
     # Rotation matrix
     matrix_rotation = [cos(angle_of_control_surface) -sin(angle_of_control_surface); sin(angle_of_control_surface) cos(angle_of_control_surface)]
 
-    for i in eachindex(x_control_surface)
-        if x[i] >= x_position_of_rotation
-            coordinate = [x[i] - x_position_of_rotation, y[i] - y_position_of_rotation]
+    for i in eachindex(coordinates)
+        if coordinates[i][1] > x_position_of_rotation
+            coordinate = [coordinates[i][1] - x_position_of_rotation, coordinates[i][2] - y_position_of_rotation]
             new_coordinate = matrix_rotation * coordinate
-            x_control_surface[i] = new_coordinate[1] + x_position_of_rotation
-            y_control_surface[i] = new_coordinate[2] + y_position_of_rotation
-        else
-            x_control_surface[i] = x[i]
-            y_control_surface[i] = y[i]
+            coordinates[i] = [new_coordinate[1] + x_position_of_rotation, new_coordinate[2] + y_position_of_rotation]
         end
     end
 
-    println(x_control_surface)
-    println(y_control_surface)
+    x_control_surface = similar(x, length(coordinates))
+    y_control_surface = similar(y, length(coordinates))
 
-    # if x_position_of_rotation > (x[end] * percent_of_chord)
-    #     splice!(x_control_surface, start_index:start_index+2, x_position_of_rotation)
-    #     splice!(y_control_surface, start_index:start_index+2, y_position_of_rotation)
-    # elseif x_position_of_rotation == (x[end] * percent_of_chord)
-    #     splice!(x_control_surface, start_index-1:start_index+1, x_position_of_rotation)
-    #     splice!(y_control_surface, start_index-1:start_index+1, y_position_of_rotation)
-    # else
-    #     splice!(x_control_surface, start_index-2:start_index, x_position_of_rotation)
-    #     splice!(y_control_surface, start_index-2:start_index, y_position_of_rotation)
-    # end
+    for i in eachindex(coordinates)
+        x_control_surface[i] = coordinates[i][1]
+        y_control_surface[i] = coordinates[i][2]
+    end
 
-    return x, y, x_control_surface, y_control_surface, x_position_of_rotation, y_position_of_rotation
+    # return x_position_of_rotation, y_position_of_rotation
+    return x, y, x_control_surface, y_control_surface, coordinates, x_position_of_rotation, y_position_of_rotation
 end
 
-# change_deflection_angle(x, y, 10, 0.72, -0.5)
-x, y, x_control_surface, y_control_surface, x_position_of_rotation, y_position_of_rotation = change_deflection_angle(x, y, 45, 0.72, 0.0)
-
-# println(x_control_surface)
-# println(y_control_surface)
+# change_deflection_angle(x, y, 10, 0.72, 0.0)
+x, y, x_control_surface, y_control_surface, coordinates, x_position_of_rotation, y_position_of_rotation = change_deflection_angle(x, y, 30, 0.72, -0.5)
 
 function plot_geometry()
-    pl = plot(x, y, label = "Before", markers=true, aspect_ratio=1)
+    pl = plot(x, y, label = "Before", markers=true, aspect_ratio=1, color=:blue)
     title!("Lower Surface")
-    scatter!(pl, (x_position_of_rotation, y_position_of_rotation), label="Coordinate of Rotation")
-    plot!(pl, x_control_surface, y_control_surface, label="After", markers=true)
+    xlabel!(pl, "Normalized Chord")
+    ylabel!(pl, "Thickness")
+    plot!(pl, x_control_surface, y_control_surface, label="After", markers=true, color=:green)
+    scatter!(pl, (x_position_of_rotation, y_position_of_rotation), label="Coordinate of Rotation", markers=true, color=:orange)
     display(pl)
 end
 
