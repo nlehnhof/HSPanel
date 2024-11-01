@@ -1,12 +1,13 @@
 using Plots
 using Interpolations
-# import Interpolations.linear_interpolation as lin_int
+
+include("intersection_points.jl")
 
 x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
 y = [0.0, -0.125, -0.25, -0.125, 0.0, 0.125, 0.25, 0.125, 0.0]
 
 # Use 2D rotation matrix
-function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chord, percent_of_thickness; V_inf=[1.0], alpha=[0.0])
+function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chord, percent_of_thickness=[0.0], V_inf=[1.0], alpha=[0.0])
 
     @assert length(x) == length(y) "length(x) does not equal lenght(y)."    
     x_control_surface = similar(x, length(x)) * 0.0
@@ -58,20 +59,49 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
     end
 
     # return x_position_of_rotation, y_position_of_rotation
-    return x, y, x_control_surface, y_control_surface, coordinates, x_position_of_rotation, y_position_of_rotation
+    geometry_rotation = ((x=x, y=y, x_control_surface=x_control_surface, y_control_surface=y_control_surface, coordinates=coordinates, x_position_of_rotation=x_position_of_rotation, y_position_of_rotation=y_position_of_rotation, y_position_of_hinge=y_position_of_hinge))
+    return geometry_rotation
 end
 
 # change_deflection_angle(x, y, 10, 0.72, 0.0)
-x, y, x_control_surface, y_control_surface, coordinates, x_position_of_rotation, y_position_of_rotation = change_deflection_angle(x, y, 30, 0.72, -0.5)
+geometry_rotation = change_deflection_angle(x, y, 30, 0.72, -0.5)
 
-function plot_geometry()
-    pl = plot(x, y, label = "Before", markers=true, aspect_ratio=1, color=:blue)
-    title!("Lower Surface")
-    xlabel!(pl, "Normalized Chord")
-    ylabel!(pl, "Thickness")
-    plot!(pl, x_control_surface, y_control_surface, label="After", markers=true, color=:green)
-    scatter!(pl, (x_position_of_rotation, y_position_of_rotation), label="Coordinate of Rotation", markers=true, color=:orange)
-    display(pl)
+# find where each graph intersects the other
+function find_intersection_points(geometry_rotation)
+    x = geometry_rotation.x
+    y = geometry_rotation.y
+    coordinates = geometry_rotation.coordinates
+    x_position_of_rotation=geometry_rotation.x_position_of_rotation
+    
+    intersections = []
+
+    index = findfirst(x -> x == x_position_of_rotation, coordinates[:][1])
+    index2 = findlast(x -> x == x_position_of_rotation, coordinates[:][1])
+    # for i in eachindex(coordinates)
+    #     if i < index || i >= index
+    #         point = segment_intersection(x[i], x[i+1], y[i], y[i+1], coordinates[i], coordinates[i+1])
+    #         push!(intersections, point)
+    #     end
+    # end
+
+    # return intersections
+    println(index)
+    println(index2)
 end
 
-plot_geometry()
+find_intersection_points(geometry_rotation)
+# intersections = find_intersection_points(geometry_rotation)
+# println(intersections)
+
+# function plot_geometry()
+#     pl = plot(geometry_rotation.x, geometry_rotation.y, label = "Before", markers=true, aspect_ratio=1, color=:blue)
+#     title!("Lower Surface")
+#     xlabel!(pl, "Normalized Chord")
+#     ylabel!(pl, "Thickness")
+#     plot!(pl, geometry_rotation.x_control_surface, geometry_rotation.y_control_surface, label="After", markers=true, color=:green)
+#     scatter!(pl, (geometry_rotation.x_position_of_rotation, geometry_rotation.y_position_of_rotation), label="Coordinate of Rotation", markers=true, color=:orange)
+#     display(pl)
+#     # savefig(pl, "control_surface_rotation_with_hinge_points.png")
+# end
+
+# plot_geometry()
