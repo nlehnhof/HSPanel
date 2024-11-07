@@ -408,7 +408,7 @@ function post_process(panel_geometry, system_geometry, strengths, V_inf=1.0, alp
     sin_angle_panels = system_geometry.s_a_p
     cos_angle_panels = system_geometry.c_a_p
     beta = system_geometry.beta
-
+    
     tangenetial_velocity = find_vt(cos_panel, sin_panel, r_panel, sin_angle_panels, cos_angle_panels, beta, strengths, V_inf, alpha)
     CP = cpressure(tangenetial_velocity)
 

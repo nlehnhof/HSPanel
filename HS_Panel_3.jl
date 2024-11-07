@@ -9,8 +9,8 @@ Authors: Nate Lehnhof
 
 using Plots
 
-# x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
-# y = [0.0, -0.125, -0.25, -0.125, 0.0, 0.125, 0.25, 0.125, 0.0]
+x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
+y = [0.0, -0.125, -0.25, -0.125, 0.0, 0.125, 0.25, 0.125, 0.0]
 
 """
     find_midpoints(x::Vector, y::Vector)
@@ -283,7 +283,7 @@ Assembles the Linear System (matrix A and matrix b)
 # Returns
 - `system_matrices::NamedTuple` : NamedTuple of matrix A (incluence on each panel) and matrix b (boundary conditions).
 """
-function generate_system_matrices(panel_geometry, system_geometry)
+function generate_system_matrices(panel_geometry, system_geometry, V_inf=1.0, alpha=0.0)
     sin_panel = panel_geometry.s_p
     cos_panel = panel_geometry.c_p
 
@@ -460,9 +460,8 @@ function analyze(
     return x, y, x_mid, y_mid, V_inf, alpha, tangenetial_velocity, CP
 end
 
-#=
-########## Validate with Joukowsky #################
 
+########## Validate with Joukowsky #################
 import FLOWFoil.AirfoilTools as at
 
 # - Parameters - #
@@ -480,27 +479,29 @@ surface_velocity, surface_pressure_coefficient, cl = at.joukowsky_flow(
 )
 
 # - Your Stuff - #
-
 alpha = deg2rad(alpha)
 
 x, y, x_mid, y_mid, V_inf, alpha, tangenetial_velocity, CP = analyze(x, y, Vinf, alpha)
 
 # - Plot Stuff - #
-pl = plot(; xlabel="x", ylabel="cp", yflip=true)
-plot!(
-    pl,
-    x[1:342],
-    surface_pressure_coefficient[1:342];
-    linestyle=:dash,
-    linewidth=2,
-    label="Analytic Solution",
-)
+# pl = plot(; xlabel="x", ylabel="cp", yflip=true)
+# plot!(
+#     pl,
+#     x[1:342],
+#     surface_pressure_coefficient[1:342];
+#     linestyle=:dash,
+#     linewidth=2,
+#     label="Analytic Solution",
+# # 
 
-println(surface_pressure_coefficient)
-println(CP)
+# println(surface_pressure_coefficient)
+# println(CP)
 
-plot!(pl, x[1:360], CP[1:360], label="Hess-Smith")
+# plot!(pl, x[1:360], CP[1:360], label="Hess-Smith")
 
+pl = plot(; xlabel="normalized chord", ylabel="height")
+title!(pl, "Body Geometry")
+plot!(pl, x, y, aspect_ratio=:equal, markers=true)
+plot!(pl, x_mid, y_mid, markers=true)
 display(pl)
-# savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
-=#
+savefig(pl, "Joukowsky_geometry.png")
