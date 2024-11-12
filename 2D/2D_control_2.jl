@@ -1,5 +1,6 @@
 using Plots
 using Interpolations
+import LinearAlgebra.norm as norm
 
 x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
 y = [0.0, -0.155, -0.25, -0.155, 0.0, 0.155, 0.25, 0.155, 0.0]
@@ -136,12 +137,12 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
         insert!(coordinates, start_index + 1, (x_position_of_rotation, -y_position_of_hinge))
         insert!(coordinates, length(coordinates) - start_index + 1, (x_position_of_rotation, y_position_of_hinge))
         index_low = start_index + 1
-        index_high = length(coordinates) -start_index + 1
+        index_high = length(coordinates) -start_index
     else
         insert!(coordinates, start_index, (x_position_of_rotation, -y_position_of_hinge))
         insert!(coordinates, length(coordinates) - start_index + 2, (x_position_of_rotation, y_position_of_hinge))
         index_low = start_index
-        index_high = length(coordinates) - start_idnex + 2
+        index_high = length(coordinates) - start_index + 2
     end
 
     # Rotation matrix
@@ -155,14 +156,7 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
         end
     end
 
-    rotated_coordinates = coordinates
-
-    if angle_of_control_surface != 0.0
-        points = inscribe_semicircle(coordinates[index_low], coordinates[index_high], 20)
-    else
-        points = []
-    end
-
+    points = inscribe_semicircle(coordinates[index_low], coordinates[index_high], 20)
 
     lower_hinge = -1 * y_position_of_hinge
     x_hinge_rotated = coordinates[start_index][1]
@@ -186,34 +180,52 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
                 insert!(coordinates, start_index + 2 + i, points[i])
             end
         end
+        deleteat!(coordinates, length(coordinates)-start_index)
+        deleteat!(coordinates, length(coordinates)-start_index)
     end
 
-    deleteat!(coordinates, length(coordinates)-start_index)
-    deleteat!(coordinates, length(coordinates)-start_index)
+    if angle_of_control_surface < 0.0
+        deleteat!(coordinates, start_index+1)
+        deleteat!(coordinates, start_index+1)
 
-    # index_lower_hinge = findfirst(t -> t == x_position_of_rotation, first.(original_coordinates))
-    # index_upper_hinge = findlast(t -> t == x_position_of_rotation, first.(original_coordinates))
-    # index_lower_intersection = findfirst(t -> t == first.(lower_intersection)[1], first.(coordinates))
+        points = reverse(points)
+        for i in eachindex(points)
+            if first.(points)[i] > x_position_of_rotation
+                insert!(coordinates, length(coordinates)-start_index, points[i])
+            end
+        end
+    end
 
-    geometry_rotation = ((x=x, y=y, y_position_of_hinge=y_position_of_hinge, coordinates=coordinates, rotated_coordinates=rotated_coordinates, x_position_of_rotation=x_position_of_rotation, y_position_of_rotation=y_position_of_rotation, original_coordinates=original_coordinates, lower_intersection=lower_intersection, upper_intersection=upper_intersection, lower_hinge=lower_hinge, points=points))
+    geometry_rotation = (
+        x=x, 
+        y=y, 
+        original_coordinates=original_coordinates, 
+        coordinates=coordinates, 
+        x_position_of_rotation=x_position_of_rotation, 
+        y_position_of_rotation=y_position_of_rotation, 
+        y_position_of_hinge=y_position_of_hinge,
+        lower_hinge=lower_hinge, 
+        lower_intersection=lower_intersection,
+        upper_intersection=upper_intersection,  
+        points=points)
 
     return geometry_rotation
 end
 
 # I have found the original geometry, used interpolation to find the hinge points on the upper and lower surfaces, inserted a point at each hingepoint, and have rotated the geometry (including the hinge points) about a point of rotation.
-geometry_rotation = change_deflection_angle(x, y, 20, 0.72, 0.0)
+geometry_rotation = change_deflection_angle(x, y, -20, 0.72, 0.0)
 
 function plot_geometry()
     pl = plot(; aspect_ratio=:equal, color=:blue, legend=:topleft)
-    plot!(geometry_rotation.x, geometry_rotation.y, markers=true, label="Before Rotation")
+    # plot!(geometry_rotation.x, geometry_rotation.y, markers=true, label="Before Rotation")
     plot!(pl, first.(geometry_rotation.coordinates), last.(geometry_rotation.coordinates), markers=true, color=:green, label="Final Rotation")
     # plot!(pl, first.(geometry_rotation.rotated_coordinates), last.(geometry_rotation.rotated_coordinates), markers=true, label="Rotated Geometry")
-    # plot!(pl, first.(geometry_rotation.points), last.(geometry_rotation.points), label="circle")
+    # plot!(pl, first.(geometry_rotation.points), last.(geometry_rotation.points), color=:red, label="circle")
     # plot!(pl, first.(geometry_rotation.new_control), last.(geometry_rotation.new_control), color=:purple, label="Sort of Full-Geo")
     # plot!(pl, first.(geometry_rotation.control_surface), last.(geometry_rotation.control_surface), markers=true, color=:orange, label="Only Control Surface")
     # plot!(pl, first.(geometry_rotation.full_geo), last.(geometry_rotation.full_geo), color=:purple, markers=true, label="Final Geometry")
     # scatter!(pl, (geometry_rotation.x_position_of_rotation, geometry_rotation.y_position_of_rotation), label="Point of Rotation", markers=true)
-    # scatter!(pl, (geometry_rotation.x_position_of_rotation, geometry_rotation.y_position_of_hinge), label = "Point of Hinge")
+    # scatter!(pl, (geometry_rotation.x_position_of_rotation, geometry_rotation.y_position_of_hinge), color=:red, label = "Point of Hinge")
     # scatter!(pl, (geometry_rotation.x_position_of_rotation, geometry_rotation.lower_hinge), label="lower hinge")
     # scatter!(pl, geometry_rotation.lower_intersection[1], label="lower intersection")
     # scatter!(pl, geometry_rotation.upper_intersection[1], label="upper intersection")
@@ -221,7 +233,7 @@ function plot_geometry()
     xlabel!(pl, "Normalized Chord")
     ylabel!(pl, "Thickness")
     display(pl)
-    savefig(pl, "Full_Geometry_at_20_degrees_Deflection.png")
+    savefig(pl, "Full_Geometry_at_negative_20_degrees_Deflection.png")
 end
 
 plot_geometry()
