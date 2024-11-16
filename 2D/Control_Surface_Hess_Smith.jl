@@ -311,6 +311,14 @@ Convenience function that updates the airfoil geometry to include a control surf
 
 # Returns
 - `system_geometry::NamedTuple` : NamedTuple that contains the original geometry, updated geoemtry with the control surface, and relevant points (point of rotation, lower hinge, upper hinge, lower intersection, upper intersection, and points (of the semicircle))
+    - `original_coordinates::Vector{Tupe{Float64, Float64}}` : Original geometry 
+    - `updated_coordinates::Vector{Tupe{Float64, Float64}}` : updated geometry
+    - `point_of_rotation::Tuple{Float64, Float64}` : Coordinate of the point of rotation
+    - `lower_hinge::Tuple{Float64, Float64}` : Coordinate of the lower hinge point 
+    - `upper_hinge::Tuple{Float64, Float64}` : Coordinate of the upper hinge point
+    - `lower_intersection::Tuple{Float64, Float64}` : Coordinate of the intersection point of the lower surface
+    - `upper_intersection::Tuple{Float64, Float64}` : Coordinate of the intersection point of the upper surface
+    - `points::Vector{Tuple{Float64, Float64}}` : Coordinates of the semicircle formed between the two hinge points
 """
 function analyze(
     x, y, angle_of_control_surface, percent_of_chord, percent_of_thickness, num_points=10
