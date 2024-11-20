@@ -1,6 +1,10 @@
 using Plots, Interpolations
 import LinearAlgebra.norm as norm
 
+x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
+y = [0.0, -0.155, -0.25, -0.155, 0.0, 0.155, 0.25, 0.155, 0.0]
+
+
 """
     find_upper_intersection(new_coords::Vector{Tuple{Float64, Float64}}, old_coords::Vector{Tuple{Float64, Float64}}, index::Int)
 
@@ -189,7 +193,7 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
     
     # y position of the upper and lower surface hinge points
     y_position_of_hinge = abs(interpolation(x_position_of_rotation))
-    y_lower_hingeower_hinge = -1 * y_position_of_hinge
+    y_lower_hinge = -1 * y_position_of_hinge
 
     # Find the index of the value that is closest to the position of rotation
     start_index = findmin(abs.(x .- x_position_of_rotation))[2]
@@ -272,6 +276,8 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
     # Return the NamedTuple geometry_rotation that consists of the original geometry, updated geometry,
     # and relevant points for graphing and understanding, including the point of rotation, hinge points, and the intersection points.
     geometry_rotation = (
+        x=x,
+        y=y,
         original_coordinates=original_coordinates,      # Original geometry
         coordinates=coordinates,                        # Updated geometry
         position_of_rotation=position_of_rotation,      # Coordinate of the point of rotation
@@ -285,29 +291,30 @@ function change_deflection_angle(x, y, angle_of_control_surface, percent_of_chor
     return geometry_rotation
 end
 
+geometry_rotation = change_deflection_angle(x, y, 20, 0.72, 0.0)
+
 ################# PLOTTING ############################
-#=
+
 function plot_geometry(geometry_rotation)
     pl = plot(; aspect_ratio=:equal, color=:blue, legend=:topleft)
     # plot!(geometry_rotation.x, geometry_rotation.y, markers=true, label="Before Rotation")
-    plot!(pl, first.(geometry_rotation.coordinates), last.(geometry_rotation.coordinates), markers=true, color=:green, label="Final Rotation")
+    plot!(pl, first.(geometry_rotation.coordinates), last.(geometry_rotation.coordinates), markers=true, color=:green, label="After Rotation")
     # plot!(pl, first.(geometry_rotation.rotated_coordinates), last.(geometry_rotation.rotated_coordinates), markers=true, label="Rotated Geometry")
     # plot!(pl, first.(geometry_rotation.points), last.(geometry_rotation.points), color=:red, label="circle")
     # plot!(pl, first.(geometry_rotation.new_control), last.(geometry_rotation.new_control), color=:purple, label="Sort of Full-Geo")
     # plot!(pl, first.(geometry_rotation.control_surface), last.(geometry_rotation.control_surface), markers=true, color=:orange, label="Only Control Surface")
     # plot!(pl, first.(geometry_rotation.full_geo), last.(geometry_rotation.full_geo), color=:purple, markers=true, label="Final Geometry")
-    # scatter!(pl, (geometry_rotation.x_position_of_rotation, geometry_rotation.y_position_of_rotation), label="Point of Rotation", markers=true)
+    scatter!(pl, geometry_rotation.position_of_rotation, label="Point of Rotation", markers=true)
     # scatter!(pl, (geometry_rotation.x_position_of_rotation, geometry_rotation.y_position_of_hinge), color=:red, label = "Point of Hinge")
     # scatter!(pl, (geometry_rotation.x_position_of_rotation, geometry_rotation.lower_hinge), label="lower hinge")
     # scatter!(pl, geometry_rotation.lower_intersection[1], label="lower intersection")
     # scatter!(pl, geometry_rotation.upper_intersection[1], label="upper intersection")
-    title!("Full Airfoil Geometry with Control Surface")
+    title!("Full Rotated Control Surface Geometry")
     xlabel!(pl, "Normalized Chord")
     ylabel!(pl, "Thickness")
     display(pl)
-    savefig(pl, "Full_Geometry_at_negative_20_degrees_Deflection.png")
+    savefig(pl, "Full_Deflection_Geo.png")
 end
 
 plot_geometry(geometry_rotation)
 ############################################
-=#

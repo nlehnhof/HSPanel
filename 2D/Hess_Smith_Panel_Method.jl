@@ -3,14 +3,11 @@
 Convenience functions wrapping problem, system, solution, and post processing
 steps into single functions for user convenience. See analyze().
 
-Authors: Nate Lehnhof
+Author: Nate Lehnhof
 
 =#
 
 using Plots
-
-# x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
-# y = [0.0, -0.125, -0.25, -0.125, 0.0, 0.125, 0.25, 0.125, 0.0]
 
 """
     find_midpoints(x::Vector, y::Vector)

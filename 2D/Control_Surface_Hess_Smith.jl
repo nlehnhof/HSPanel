@@ -1,3 +1,12 @@
+#=
+
+Convenience functions wrapping problem, system, solution, and post processing
+steps into single functions for user convenience. See analyze().
+
+Author: Nate Lehnhof
+
+=#
+
 using Plots, Interpolations
 import LinearAlgebra.norm as norm
 
@@ -54,7 +63,7 @@ function find_intersection(new_coords, old_coords, index, surface::String)
     if surface == "upper"
         loop_range = x_coords1[1]:0.0001:x_coords1[end]
     else
-        loop_range = x_coords1[end]:-0.0001:x_coords1[1]
+        loop_range = x_coords1[length(new_coords)-3-index]:0.0001:x_coords1[1]
     end
 
     # Find intersections
@@ -198,7 +207,8 @@ function generate_panel_geometry(x, y, angle_of_control_surface, percent_of_chor
         index=start_index,
         point_of_rotation=point_of_rotation,
         upper_hinge=upper_hinge,
-        lower_hinge=lower_hinge
+        lower_hinge=lower_hinge,
+        angle_of_control_surface=angle_of_control_surface
         )
 
     return geometry_rotation
@@ -226,6 +236,7 @@ This function takes the original geometry of the airfoil and rotates it about th
     - `lower_intersection::Tuple{Float64, Float64}` : Coordinate of the intersection point of the lower surface
     - `upper_intersection::Tuple{Float64, Float64}` : Coordinate of the intersection point of the upper surface
     - `points::Vector{Tuple{Float64, Float64}}` : Coordinates of the semicircle formed between the two hinge points
+    - `angle_of_control_surface::Float64` : user-defined angle of the control surface 
 """
 function update_geometry(geometry_rotation)
     new_coords = geometry_rotation.rotated_coordinates
@@ -235,6 +246,7 @@ function update_geometry(geometry_rotation)
     upper_hinge = geometry_rotation.upper_hinge 
     point_of_rotation = geometry_rotation.point_of_rotation
     points = geometry_rotation.points
+    angle_of_control_surface = geometry_rotation.angle_of_control_surface
 
     # Find the indexes of the hinge points in the new, rotated geoemtry
     x_hinge_rotated = new_coords[index][1]
@@ -243,8 +255,8 @@ function update_geometry(geometry_rotation)
     index_upper_hinge = findfirst(t -> t == x_top_hinge_rotated, first.(new_coords))
 
     # Find where the new, rotated geometry (new_coords), intersects the old geometry (original_coordinates)
-    lower_intersection = find_lower_intersection(old_coords, new_coords, index, "lower")
-    upper_intersection = find_upper_intersection(old_coords, new_coords, index, "upper")
+    lower_intersection = find_intersection(old_coords, new_coords, index, "lower")
+    upper_intersection = find_intersection(old_coords, new_coords, index, "upper")
 
     # Insert the hinge points and the intersection points into the rotated geoemtry (new_coords)
     insert!(new_coords, index, lower_intersection[1])
@@ -257,7 +269,7 @@ function update_geometry(geometry_rotation)
     if angle_of_control_surface > 0.0
         points = reverse(points)
         for i in eachindex(points)
-            if first.(points)[i] > x_position_of_rotation
+            if first.(points)[i] > point_of_rotation[1]
                 insert!(new_coords, index + 2 + i, points[i])
             end
         end
@@ -273,14 +285,14 @@ function update_geometry(geometry_rotation)
 
         points = reverse(points)
         for i in eachindex(points)
-            if first.(points)[i] > x_position_of_rotation
+            if first.(points)[i] > point_of_rotation[1]
                 insert!(new_coords, length(new_coords)-index, points[i])
             end
         end
     end
 
     system_geometry = (
-        original_coordinates=original_coordinates,
+        original_coordinates=old_coords,
         updated_geometry=new_coords,
         point_of_rotation=point_of_rotation,
         lower_hinge=lower_hinge,
@@ -332,3 +344,26 @@ function analyze(
 
     return system_geometry
 end
+
+################# PLOTTING ############################
+#=
+x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
+y = [0.0, -0.155, -0.25, -0.155, 0.0, 0.155, 0.25, 0.155, 0.0]
+
+system_geometry = analyze(x, y, 20, 0.72, 0.0, 10)
+
+function plot_geometry()
+    pl = plot(; aspect_ratio=:equal, color=:blue, legend=:topleft)
+    plot!(pl, first.(system_geometry.original_coordinates), last.(system_geometry.original_coordinates), markers=true, label="original coordinates")
+    scatter!(pl, system_geometry.point_of_rotation, label="Point of Rotation")
+    scatter!(pl, system_geometry.lower_hinge, label="Lower Hinge")
+    scatter!(pl, system_geometry.upper_hinge, label="Upper Hinge")
+    title!(pl, "Original Geometry")
+    xaxis!(pl, "Normalized Chord")
+    yaxis!(pl, "Airfoil Thickness")
+    display(pl)
+    savefig(pl, "original_geometry_with_hinge_points.png")
+end
+
+plot_geometry()
+=#
