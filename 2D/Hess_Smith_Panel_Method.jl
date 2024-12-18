@@ -8,6 +8,7 @@ Author: Nate Lehnhof
 =#
 
 using Plots
+using LinearAlgebra
 
 """
     find_midpoints(x::Vector, y::Vector)
@@ -82,7 +83,7 @@ function generate_panel_geometry(x, y)
     x_mid, y_mid = find_midpoints(x, y)
     sin_panel, cos_panel = find_sin_cos_of_panel(x, y, x_mid)
     # Create a NamedTuple with the panel geoemtry
-    panel_geometry = ((x_m=x_mid, y_m=y_mid, s_p=sin_panel, c_p=cos_panel))
+    panel_geometry = (x_m=x_mid, y_m=y_mid, s_p=sin_panel, c_p=cos_panel)
     return panel_geometry
 end
 
@@ -237,11 +238,12 @@ function find_A(r_panel, sin_angle_panels, cos_angle_panels, beta)
             A[i, end] += log(r_panel[i, j+1] / r_panel[i, j]) * cos_angle_panels[i, j] - beta[i, j] * sin_angle_panels[i, j]
         end
     end
+    
     return A
 end
 
 """
-    find_b(sin_panel::Vector, cos_panel::Vector, V_inf::Float64, alpha::Float64)
+    find_b(sin_panel::Vector, cos_panel::Vector, V_inf::Float64, AoA::Float64)
 
 Assembles the no-flow-through conditions and the Kutta condition in one Vector.
 This function constructs vector `b`, which incorporates both the no-flow-through boundary conditions and the Kutta condition. See Eq. 2.223 and 2.233, and Fig. 2.234 on pages 72 and 76 in *Computational Aerodynamics* by Dr. Ning.
@@ -252,19 +254,19 @@ This function constructs vector `b`, which incorporates both the no-flow-through
 
 # Keyword Arguments
 - `V_inf::Float64=1.0` : freestream velocity defined by the user
-- `alpha::Float64=0.0` : angle of attack in degrees, defined by the user
+- `AoA::Float64=0.0` : angle of attack in degrees, defined by the user
 
 # Returns:
 - `b::Vector` : boundary conditions vector, including the no-flow-through and Kutta conditions
 """
-function find_b(sin_panel, cos_panel, V_inf=1.0, alpha=0.0)
+function find_b(sin_panel, cos_panel, V_inf, AoA)
     b = similar(sin_panel, length(sin_panel) + 1)
     # Refer to Eq. 2.223 in Dr. Ning's textbook
     for i in eachindex(sin_panel)
-        b[i] = 2 * π * V_inf * (sin_panel[i] * cos(alpha) - cos_panel[i] * sin(alpha))
+        b[i] = 2 * π * V_inf * (sin_panel[i] * cos(AoA) - cos_panel[i] * sin(AoA))
     end
     # Refer to Eq. 2.233 in Dr. Ning's textbook
-    b[end] = -2 * π * V_inf * ((cos_panel[1] * cos(alpha) + sin_panel[1] * sin(alpha)) + (cos_panel[end] * cos(alpha) + sin_panel[end] * sin(alpha)))
+    b[end] = -2 * π * V_inf * ((cos_panel[1] * cos(AoA) + sin_panel[1] * sin(AoA)) + (cos_panel[end] * cos(AoA) + sin_panel[end] * sin(AoA)))
     return b
 end
 
@@ -280,7 +282,7 @@ Assembles the Linear System (matrix A and matrix b)
 # Returns
 - `system_matrices::NamedTuple` : NamedTuple of matrix A (incluence on each panel) and matrix b (boundary conditions).
 """
-function generate_system_matrices(panel_geometry, system_geometry)
+function generate_system_matrices(panel_geometry, system_geometry, V_inf, AoA)
     sin_panel = panel_geometry.s_p
     cos_panel = panel_geometry.c_p
 
@@ -289,8 +291,15 @@ function generate_system_matrices(panel_geometry, system_geometry)
     cos_angle_panels = system_geometry.c_a_p
     beta = system_geometry.beta
 
+    @assert all(isfinite, sin_panel) "sin_panel"
+    @assert all(isfinite, cos_panel) "cos_panel"
+    @assert all(isfinite, r_panel) "r_panel"
+    @assert all(isfinite, sin_angle_panels) "sin_angle_panels"
+    @assert all(isfinite, cos_angle_panels) "cos_angle_panels"
+    @assert all(isfinite, beta) "beta"
+
     A = find_A(r_panel, sin_angle_panels, cos_angle_panels, beta)
-    b = find_b(sin_panel, cos_panel, V_inf, alpha)
+    b = find_b(sin_panel, cos_panel, V_inf, AoA)
 
     # Create NamedTuple for the system matrices
     system_matrices = ((a_matrix=A, b_matrix=b))
@@ -312,12 +321,13 @@ This function calculates `strengths`, where each entry represents the source str
 """
 function solve(system_matrices)
     # Solve the systems of equations
-    strengths = system_matrices.a_matrix \ system_matrices.b_matrix
+    A_reg = system_matrices.a_matrix + 1e-5 * I
+    strengths = A_reg \ system_matrices.b_matrix
     return strengths
 end
 
 """
-    find_vt(r_panel::Array, sin_panel::Vector, cos_panel::Vector, sin_angle_panels::Array, cos_angle_panels::Array, beta::Array, q_gamma::Vector, V_inf::Float64, alpha::Float64)
+    find_vt(r_panel::Array, sin_panel::Vector, cos_panel::Vector, sin_angle_panels::Array, cos_angle_panels::Array, beta::Array, q_gamma::Vector, V_inf::Float64, AoA::Float64)
 
 Computes the tangential velocity of each panel.
 
@@ -334,22 +344,24 @@ This function calculates the tangential velocities based on Eq. 2.237 on pg. 78 
 
 # Keyword Arguments
 - `V_inf::Float64` : freestream velocity defined by the user
-- `alpha::Float64` : angle of attack in degrees, defined by the user
+- `AoA::Float64` : angle of attack in degrees, defined by the user
 
 # Returns:
 - `tangential_velocity::Vector` : tangential velocity at each panel
 """
-function find_vt(cos_panel, sin_panel, r_panel, sin_angle_panels, cos_angle_panels, beta, q_gamma, V_inf=1.0, alpha=0.0)
-    tangential_velocity = similar(q_gamma, length(q_gamma) - 1)
+function find_vt(cos_panel, sin_panel, r_panel, sin_angle_panels, cos_angle_panels, beta, strengths, V_inf, AoA)
+    tangential_velocity = similar(strengths, length(strengths) - 1)
     # See eq. 2.237 in Dr. Ning's textbook
-    for i in eachindex(q_gamma[1:end-1])
+    
+    for i in eachindex(strengths[1:end-1])
         set1 = 0.0
         set2 = 0.0
-        for j in eachindex(q_gamma[1:end-1])
-            set1 += q_gamma[j] * (beta[i, j] * sin_angle_panels[i, j] - log(r_panel[i, j+1] / r_panel[i, j]) * cos_angle_panels[i, j])
+
+        for j in eachindex(strengths[1:end-1])    
+            set1 += strengths[j] * (beta[i, j] * sin_angle_panels[i, j] - log(r_panel[i, j+1] / r_panel[i, j]) * cos_angle_panels[i, j])
             set2 += beta[i, j] * cos_angle_panels[i, j] + log(r_panel[i, j+1] / r_panel[i, j]) * sin_angle_panels[i, j]
         end
-        tangential_velocity[i] = V_inf * (cos_panel[i] * cos(alpha) + sin_panel[i] * sin(alpha)) + (set1 / (2 * π)) + (q_gamma[end] / (2 * π)) * set2
+        tangential_velocity[i] = V_inf * (cos_panel[i] * cos(AoA) + sin_panel[i] * sin(AoA)) + (set1 / (2 * π)) + (strengths[end] / (2 * π)) * set2
     end
     return tangential_velocity
 end
@@ -368,14 +380,14 @@ Calculates the pressure coefficient `CP` at each panel based on Eq. 2.238 on pg.
 # Returns:
 - `CP::Vector` : coefficient of pressure at each panel
 """
-function cpressure(tangential_velocity, V_inf=1.0)
+function cpressure(tangential_velocity, V_inf)
     # See eq. 238 in Dr. Ning's textbook
     CP = 1 .- (tangential_velocity ./ V_inf) .^ 2
     return CP
 end
 
 """
-    post_process(panel_geometry::NamedTuple, system_geometry::NamedTuple, strengths::NamedTuple, V_inf::Float64, alpha::Float64)
+    post_process(panel_geometry::NamedTuple, system_geometry::NamedTuple, strengths::NamedTuple, V_inf::Float64, AoA::Float64)
 
 # Arguments
 - `panel_geometry::NamedTuple` : NamedTuple including the geometry of each panel (x, y, x_mid, y_mid, sin_panel, cos_panel) 
@@ -384,7 +396,7 @@ end
 
 # Keyword Arguments
 - `V_inf::Float64=1.0` : User-defined freestream velocity of the airfoil
-- `alpha::Float64=0.0` : User-defined angle of attack of the airfoil in degrees
+- `AoA::Float64=0.0` : User-defined angle of attack of the airfoil in degrees
 
 # Returns
 - `x::Vector` : x-coordinates of each point on the body
@@ -392,11 +404,11 @@ end
 - `x_mid::Vector` : x-coordinate of the midpoint for each panel
 - `y_mid::Vector` : y-coordinate of the midpoint for each panel
 - `V_inf::Float64=1.0` : User-defined freestream velocity.
-- `alpha::Float64=0.0` : Angle of attack in degrees 
+- `AoA::Float64=0.0` : Angle of attack in degrees 
 - `tangential_velocity::Vector` : tangential velocity at each panel
 - `CP::Vector` : coefficient of pressure at each panel
 """
-function post_process(panel_geometry, system_geometry, strengths, V_inf=1.0, alpha=0.0)
+function post_process(panel_geometry, system_geometry, strengths, V_inf, AoA)
     x_mid = panel_geometry.x_m
     y_mid = panel_geometry.y_m
     cos_panel = panel_geometry.c_p
@@ -406,14 +418,14 @@ function post_process(panel_geometry, system_geometry, strengths, V_inf=1.0, alp
     cos_angle_panels = system_geometry.c_a_p
     beta = system_geometry.beta
     
-    tangenetial_velocity = find_vt(cos_panel, sin_panel, r_panel, sin_angle_panels, cos_angle_panels, beta, strengths, V_inf, alpha)
-    CP = cpressure(tangenetial_velocity)
+    tangenetial_velocity = find_vt(cos_panel, sin_panel, r_panel, sin_angle_panels, cos_angle_panels, beta, strengths, V_inf, AoA)
+    CP = cpressure(tangenetial_velocity, V_inf)
 
-    return x, y, x_mid, y_mid, V_inf, alpha, tangenetial_velocity, CP
+    return x, y, x_mid, y_mid, V_inf, AoA, tangenetial_velocity, CP
 end
 
 """
-    analyze(x::Vector, y::Vector, V_inf::Float64, alpha::Float64)
+    analyze(x::Vector, y::Vector, V_inf::Float64, AoA::Float64)
 
 Convenience function for setting up, solving, and post-processing airfoils and airfoil systems.
 
@@ -423,20 +435,21 @@ Convenience function for setting up, solving, and post-processing airfoils and a
 
 # Keyword Arguments
 - `V_inf::Float64=1.0` : User-defined freestream velocity.
-- `alpha::Float64=0.0` : Angle of attack in degrees 
+- `AoA::Float64=0.0` : Angle of attack in degrees 
 
 # Returns
-- `x::Vector` : x-coordinates of each point on the body
-- `y::Vector` : y-coordinates of each point on the body
-- `x_mid::Vector` : x-coordinate of the midpoint for each panel
-- `y_mid::Vector` : y-coordinate of the midpoint for each panel
-- `V_inf::Float64=1.0` : User-defined freestream velocity.
-- `alpha::Float64=0.0` : Angle of attack in degrees 
-- `tangential_velocity::Vector` : tangential velocity at each panel
-- `CP::Vector` : coefficient of pressure at each panel
+- `geo::NamedTuple` : NamedTuple including the following
+    - `x::Vector` : x-coordinates of each point on the body
+    - `y::Vector` : y-coordinates of each point on the body
+    - `x_mid::Vector` : x-coordinate of the midpoint for each panel
+    - `y_mid::Vector` : y-coordinate of the midpoint for each panel
+    - `V_inf::Float64=1.0` : User-defined freestream velocity.
+    - `AoA::Float64=0.0` : Angle of attack in degrees 
+    - `tangential_velocity::Vector` : tangential velocity at each panel
+    - `CP::Vector` : coefficient of pressure at each panel
 """
 function analyze(
-    x, y, V_inf=1.0, alpha=0.0
+    x, y, V_inf=1.0, AoA=0.0
 )
 
     # Generate Panel Geometry
@@ -446,13 +459,54 @@ function analyze(
     system_geometry = generate_system_geometry(x, y, panel_geometry)
 
     # Assemble Linear System
-    system_matrices = generate_system_matrices(panel_geometry, system_geometry)
+    system_matrices = generate_system_matrices(panel_geometry, system_geometry, V_inf, AoA)
 
     # Solve System
     strengths = solve(system_matrices)
 
     # Post Process Solution
-    x, y, x_mid, y_mid, V_inf, alpha, tangenetial_velocity, CP = post_process(panel_geometry, system_geometry, strengths, V_inf, alpha)
+    x, y, x_mid, y_mid, V_inf, AoA, tangenetial_velocity, CP = post_process(panel_geometry, system_geometry, strengths, V_inf, AoA)
 
-    return x, y, x_mid, y_mid, V_inf, alpha, tangenetial_velocity, CP
+    geo = (x=x, y=y, x_mid=x_mid, y_mid=y_mid, V_inf=V_inf, AoA=AoA, tangenetial_velocity=tangenetial_velocity, CP=CP)
+
+    return geo
 end
+
+# ########## Validate with Joukowsky #################
+# import FLOWFoil.AirfoilTools as at
+
+# # - Parameters - #
+# center = [-0.1; 0.1]
+# radius = 1.0
+# alpha = 4.0
+# Vinf = 1.0
+
+# # - Joukowsky Geometry - #
+# x, y = at.joukowsky(center, radius)
+
+# # - Surface Values - #
+# surface_velocity, surface_pressure_coefficient, cl = at.joukowsky_flow(
+#     center, radius, alpha, Vinf
+# )
+
+# # - Your Stuff - #
+# alpha = deg2rad(alpha)
+
+# # - Plot Stuff - #
+# pl = plot(; xlabel="X", ylabel="CP", yflip=true)
+# plot!(
+#     pl,
+#     x[7:360],
+#     surface_pressure_coefficient[7:360];
+#     linestyle=:dash,
+#     linewidth=2,
+#     label="Analytic Solution",
+#     title = "Coefficient of Pressure"
+# )
+
+# x, y, x_mid, y_mid, V_inf, alpha, tangenetial_velocity, CP = analyze(x, y, Vinf, alpha)
+
+# plot!(pl, x[10:350], CP[10:350], label="Hess-Smith")
+
+# display(pl)
+# # savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")

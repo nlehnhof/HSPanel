@@ -28,10 +28,10 @@ Uses interpolation and returns the point of intersection.
 function find_intersection(new_coords, old_coords, index, surface::String)
     if surface == "upper"
         # Extract x and y coordinates for the upper surface
-        x_coords1 = first.(new_coords)[length(new_coords) - index - 2:end]
-        y_coords1 = last.(new_coords)[length(new_coords) - index - 2:end]
-        x_coords2 = first.(old_coords)[length(old_coords) - index:end]
-        y_coords2 = last.(old_coords)[length(old_coords) - index:end]
+        x_coords1 = first.(new_coords)[length(new_coords) - index - 4:end]
+        y_coords1 = last.(new_coords)[length(new_coords) - index - 4:end]
+        x_coords2 = first.(old_coords)[length(old_coords) - index - 4:end]
+        y_coords2 = last.(old_coords)[length(old_coords) - index - 4:end]
     elseif surface == "lower"
         # Extract x and y coordinates for the lower surface
         x_coords1 = first.(new_coords)[1:index + 2]
@@ -56,14 +56,15 @@ function find_intersection(new_coords, old_coords, index, surface::String)
     interp2 = LinearInterpolation(x_sorted2, y_sorted2, extrapolation_bc=NaN)
 
     # Set a tolerance value
-    tol = 1e-4
     intersection_points = []
 
     # Determine loop range based on surface
     if surface == "upper"
+        tol = 1e-4
         loop_range = x_coords1[1]:0.0001:x_coords1[end]
     else
-        loop_range = x_coords1[length(new_coords)-3-index]:0.0001:x_coords1[1]
+        tol = 1e-4
+        loop_range = x_coords1[length(x_coords1)]:0.0001:x_coords1[1]
     end
 
     # Find intersections
@@ -150,35 +151,34 @@ function generate_panel_geometry(x, y, angle_of_control_surface, percent_of_chor
     angle_of_control_surface = deg2rad(angle_of_control_surface)
     original_coordinates = [(xi, yi) for (xi, yi) in zip(x, y)]
     coordinates = [(xi, yi) for (xi, yi) in zip(x, y)]
-
-    # Sort points
-    sorted_indices = sortperm(x[1:round(Int, length(x) / 2)])
-    x_sorted = x[sorted_indices]
-    y_sorted = y[sorted_indices]
-
-    # Use interpolation to find the x and y coordinates about which to rotate the control surface
-    x_position_of_rotation = percent_of_chord * x[1]
-    interpolation = LinearInterpolation(x_sorted, y_sorted, extrapolation_bc=NaN)  # NaN for values outside the range
-    y_position_of_rotation = abs(interpolation(x_position_of_rotation)) * (percent_of_thickness)
     
-    # y position of the upper and lower surface hinge points
-    y_position_of_hinge = abs(interpolation(x_position_of_rotation))
-    y_lower_hinge = -1 * y_position_of_hinge
+    # Split and sort upper and lower surfaces
+    mid_index = argmin(x)
+    x_upper, y_upper = x[1:mid_index], y[1:mid_index]
+    x_lower, y_lower = x[mid_index+1:end], y[mid_index+1:end]
+
+    x_sorted_upper, y_sorted_upper = sort(x_upper), y_upper[sortperm(x_upper)]
+    x_sorted_lower, y_sorted_lower = sort(x_lower), y_lower[sortperm(x_lower)]
+
+    # Interpolation for hinge points
+    interpolation_upper = LinearInterpolation(x_sorted_upper, y_sorted_upper, extrapolation_bc=NaN)
+    interpolation_lower = LinearInterpolation(x_sorted_lower, y_sorted_lower, extrapolation_bc=NaN)
+    x_position_of_rotation = percent_of_chord * x[1]
+
+    y_lower_hinge = interpolation_upper(x_position_of_rotation)
+    y_upper_hinge = interpolation_lower(x_position_of_rotation)
+    y_position_of_rotation = y_lower_hinge + (y_upper_hinge - y_lower_hinge) * percent_of_thickness
 
     # Find the index of the value that is closest to the position of rotation
-    start_index = findmin(abs.(x .- x_position_of_rotation))[2]
+    start_index = findmin(abs.(x[1:round(Int, length(x)/2)] .- x_position_of_rotation))[2]
 
     # Use the start_index to insert the hinge points into the geomtry of the airfoil
     if x_position_of_rotation < x[start_index]
-        insert!(coordinates, start_index + 1, (x_position_of_rotation, -y_position_of_hinge))
-        insert!(coordinates, length(coordinates) - start_index + 1, (x_position_of_rotation, y_position_of_hinge))
-        index_low = start_index + 1
-        index_high = length(coordinates) -start_index
+        insert!(coordinates, start_index+1, (x_position_of_rotation, y_lower_hinge))
+        insert!(coordinates, length(coordinates) - start_index-1, (x_position_of_rotation, y_upper_hinge))
     else
-        insert!(coordinates, start_index, (x_position_of_rotation, -y_position_of_hinge))
-        insert!(coordinates, length(coordinates) - start_index + 2, (x_position_of_rotation, y_position_of_hinge))
-        index_low = start_index
-        index_high = length(coordinates) - start_index + 2
+        insert!(coordinates, start_index, (x_position_of_rotation, y_lower_hinge))
+        insert!(coordinates, length(coordinates) - start_index -3, (x_position_of_rotation, y_upper_hinge))
     end
 
     # Rotation matrix
@@ -193,19 +193,24 @@ function generate_panel_geometry(x, y, angle_of_control_surface, percent_of_chor
         end
     end
 
-    # Find the points that make up the semicircle between the two hinge points
-    points = inscribe_semicircle(coordinates[index_low], coordinates[index_high], num_points)
-
     point_of_rotation = (x_position_of_rotation, y_position_of_rotation)
-    upper_hinge = (x_position_of_rotation, y_position_of_hinge)
+    upper_hinge = (x_position_of_rotation, y_upper_hinge)
     lower_hinge = (x_position_of_rotation, y_lower_hinge)
+
+    points = inscribe_semicircle(lower_hinge, upper_hinge, num_points)
+
+    for i in eachindex(points)
+        coordinate = [points[i][1] - x_position_of_rotation, points[i][2] - y_position_of_rotation]
+        new_coordinate = matrix_rotation * coordinate
+        points[i] = (new_coordinate[1] + x_position_of_rotation, new_coordinate[2] + y_position_of_rotation)
+    end
 
     geometry_rotation = (
         original_coordinates=original_coordinates,
         rotated_coordinates=coordinates,
-        points=points,
         index=start_index,
         point_of_rotation=point_of_rotation,
+        points=points,
         upper_hinge=upper_hinge,
         lower_hinge=lower_hinge,
         angle_of_control_surface=angle_of_control_surface
@@ -245,52 +250,59 @@ function update_geometry(geometry_rotation)
     lower_hinge = geometry_rotation.lower_hinge
     upper_hinge = geometry_rotation.upper_hinge 
     point_of_rotation = geometry_rotation.point_of_rotation
-    points = geometry_rotation.points
     angle_of_control_surface = geometry_rotation.angle_of_control_surface
-
-    # Find the indexes of the hinge points in the new, rotated geoemtry
-    x_hinge_rotated = new_coords[index][1]
-    x_top_hinge_rotated = new_coords[length(new_coords)-index][1]
-    index_lower_hinge = findfirst(t -> t == x_hinge_rotated, first.(new_coords))
-    index_upper_hinge = findfirst(t -> t == x_top_hinge_rotated, first.(new_coords))
+    points=geometry_rotation.points
 
     # Find where the new, rotated geometry (new_coords), intersects the old geometry (original_coordinates)
-    lower_intersection = find_intersection(old_coords, new_coords, index, "lower")
-    upper_intersection = find_intersection(old_coords, new_coords, index, "upper")
+    if angle_of_control_surface < 0
+        lower_intersection = find_intersection(old_coords, new_coords, index, "lower")
+        upper_intersection = 1.0
+        low_inter_index = findmin(abs.(first.(new_coords[1:round(Int, length(new_coords)/2)]) .- lower_intersection[1][1]))[2]
+        if lower_intersection[1][1] < first.(new_coords)[low_inter_index]
+            insert!(new_coords, low_inter_index + 1, lower_intersection[1])
+            low_index = low_inter_index + 1
+        elseif lower_intersection[1][1] > first.(new_coords)[low_inter_index]
+            insert!(new_coords, low_inter_index, lower_intersection[1])
+            low_index = low_inter_index
+        else
+            low_index = low_inter_index
+        end
+        n = 0
+        for i in low_index-5:low_index
+            j = i - n
+            if last.(new_coords)[j] > lower_intersection[1][2]
+                deleteat!(new_coords, j)
+                n += 1
+            end
+        end
+    elseif angle_of_control_surface == 0.0
+        lower_intersection = 1.0
+        upper_intersection = 1.0
+    else
+        upper_intersection = find_intersection(old_coords, new_coords, index, "upper")
+        lower_intersection = 1.0
+        upper_inter_index = findmin(abs.(first.(new_coords)[round(Int, length(new_coords)/2):end] .- upper_intersection[1][1]))[2] + round(Int, length(new_coords)/2) - 1
+        if upper_intersection[1][1] < first.(new_coords)[upper_inter_index]
+            insert!(new_coords, upper_inter_index, upper_intersection[1])
+            up_index = upper_inter_index + 1
+        elseif upper_intersection[1][1] > first.(new_coords)[upper_inter_index]
+            insert!(new_coords, upper_inter_index + 1, upper_intersection[1])
+            up_index = upper_inter_index + 1
+        else
+            up_index = upper_inter_index
+        end
+        n = 0
+        for i in up_index-5:up_index
+            j = i - n
+            if last.(new_coords)[j] < upper_intersection[1][2]
+                deleteat!(new_coords, j)
+                n += 1
+            end
+        end
+    end
 
-    # Insert the hinge points and the intersection points into the rotated geoemtry (new_coords)
-    insert!(new_coords, index, lower_intersection[1])
-    insert!(new_coords, length(new_coords)-index+2, upper_intersection[1])
-    insert!(new_coords, index_lower_hinge+3, lower_hinge)
-    insert!(new_coords, index_upper_hinge+2, upper_hinge)
+    angle_of_control_surface = rad2deg(angle_of_control_surface)
     
-    # Remove values of the rotated geomtry that are inside the airfoil geometry
-    # Insert those values of the semicircle that bridge the gap between the rotated hinge point and the original hinge point
-    if angle_of_control_surface > 0.0
-        points = reverse(points)
-        for i in eachindex(points)
-            if first.(points)[i] > point_of_rotation[1]
-                insert!(new_coords, index + 2 + i, points[i])
-            end
-        end
-        deleteat!(new_coords, length(new_coords)-index)
-        deleteat!(new_coords, length(new_coords)-index)
-    end
-
-    # Remove values of the rotated geomtry that are inside the airfoil geometry
-    # Insert those values of the semicircle that bridge the gap between the rotated hinge point and the original hinge point
-    if angle_of_control_surface < 0.0
-        deleteat!(new_coords, index+1)
-        deleteat!(new_coords, index+1)
-
-        points = reverse(points)
-        for i in eachindex(points)
-            if first.(points)[i] > point_of_rotation[1]
-                insert!(new_coords, length(new_coords)-index, points[i])
-            end
-        end
-    end
-
     system_geometry = (
         original_coordinates=old_coords,
         updated_geometry=new_coords,
@@ -299,12 +311,13 @@ function update_geometry(geometry_rotation)
         upper_hinge=upper_hinge,
         lower_intersection=lower_intersection,
         upper_intersection=upper_intersection,
-        points=points
+        points=points,
+        index=index,
+        angle_of_control_surface=angle_of_control_surface
         )
 
     return system_geometry
 end
-
 
 """
     analyze(x::Vector, y::Vector, angle_of_control_surface::Float64, percent_of_chord::Float64, percent_of_thickness::Float64, num_points::Int=10)
@@ -331,8 +344,9 @@ Convenience function that updates the airfoil geometry to include a control surf
     - `lower_intersection::Tuple{Float64, Float64}` : Coordinate of the intersection point of the lower surface
     - `upper_intersection::Tuple{Float64, Float64}` : Coordinate of the intersection point of the upper surface
     - `points::Vector{Tuple{Float64, Float64}}` : Coordinates of the semicircle formed between the two hinge points
+    - `angle_of_control_surface::Float64` : Angle of control surface
 """
-function analyze(
+function analyze_cs(
     x, y, angle_of_control_surface, percent_of_chord, percent_of_thickness, num_points=10
 )
 
@@ -345,25 +359,26 @@ function analyze(
     return system_geometry
 end
 
-################# PLOTTING ############################
-#=
-x = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75, 1.0]
-y = [0.0, -0.155, -0.25, -0.155, 0.0, 0.155, 0.25, 0.155, 0.0]
+########## Validate with Joukowsky #################
+include("Hess_Smith_Panel_Method.jl")
 
-system_geometry = analyze(x, y, 20, 0.72, 0.0, 10)
+system_geometry = analyze_cs(x, y, -20.0, 0.8, 0.5, 10)
 
-function plot_geometry()
-    pl = plot(; aspect_ratio=:equal, color=:blue, legend=:topleft)
-    plot!(pl, first.(system_geometry.original_coordinates), last.(system_geometry.original_coordinates), markers=true, label="original coordinates")
-    scatter!(pl, system_geometry.point_of_rotation, label="Point of Rotation")
-    scatter!(pl, system_geometry.lower_hinge, label="Lower Hinge")
-    scatter!(pl, system_geometry.upper_hinge, label="Upper Hinge")
-    title!(pl, "Original Geometry")
-    xaxis!(pl, "Normalized Chord")
-    yaxis!(pl, "Airfoil Thickness")
-    display(pl)
-    savefig(pl, "original_geometry_with_hinge_points.png")
-end
+geo = analyze(first.(system_geometry.updated_geometry), last.(system_geometry.updated_geometry), Vinf, alpha)
 
-plot_geometry()
-=#
+# - Plot Stuff - #
+pl2 = plot(geo.x[10:350], geo.CP[10:350], markers=false, label=false, yflip=true, title="Coefficient of Pressure at $(system_geometry.angle_of_control_surface) Degrees", xlabel="Chord", ylabel="Thickness")
+display(pl2)
+savefig(pl2, "CP_flap_$(system_geometry.angle_of_control_surface)_degrees.png")
+
+# function plot_geometry()
+#     pl = plot(; aspect_ratio=1, color=:blue, legend=:topleft)
+#     plot!(pl, first.(system_geometry.updated_geometry), last.(system_geometry.updated_geometry), markers=true, markersize=1, label=false)
+#     title!(pl, "Jakousky with Flap at $(system_geometry.angle_of_control_surface) Degree Deflection")
+#     xaxis!(pl, "Normalized Chord")
+#     yaxis!(pl, "Airfoil Thickness")
+#     display(pl)
+#     # savefig(pl, "j_flap_-10.png")
+# end
+
+# plot_geometry()

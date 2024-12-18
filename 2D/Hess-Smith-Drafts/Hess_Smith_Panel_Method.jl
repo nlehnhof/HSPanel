@@ -459,3 +459,44 @@ function analyze(
 
     return x, y, x_mid, y_mid, V_inf, alpha, tangenetial_velocity, CP
 end
+
+# ########## Validate with Joukowsky #################
+
+# using FLOWFoil
+# using Plots
+# using .AirfoilTools
+
+# # - Parameters - #
+# center = [-0.1; 0.1]
+# radius = 1.0
+# alpha = 4.0
+# Vinf = 1.0
+
+# # - Joukowsky Geometry - #
+# x, y = FLOWFoil.AirfoilTools.joukowsky(center, radius)
+
+# # - Surface Values - #
+# surface_velocity, surface_pressure_coefficient, cl = FLOWFoil.AirfoilTools.joukowsky_flow(
+#     center, radius, alpha, Vinf
+# )
+
+# # - Your Stuff - #
+# alpha = deg2rad(alpha)
+
+# # - Plot Stuff - #
+# pl = plot(; xlabel="x", ylabel="cp", yflip=true)
+# plot!(
+#     pl,
+#     x[7:360],
+#     surface_pressure_coefficient[7:360];
+#     linestyle=:dash,
+#     linewidth=2,
+#     label="Analytic Solution",
+# )
+
+# x, y, x_mid, y_mid, V_inf, alpha, tangenetial_velocity, CP = analyze(x, y, Vinf, alpha)
+
+# plot!(pl, x[10:350], CP[10:350], label="Hess-Smith")
+
+# # display(pl)
+# # savefig(pl, "Hess_Smith_vs_Analytic_Solution.png")
